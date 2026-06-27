@@ -14,8 +14,10 @@ async function loadBenefitsData() {
     updateDashboard();
 
     try {
+        // 로컬 경로가 아닌 깃허브 실시간 무료 클라우드 저장소(자동 수집본) URL 주소 연동
         // 캐시 버스팅 적용 (?v= 타임스탬프)으로 브라우저 구버전 캐싱 완벽 우회 강제 적용
-        const response = await fetch(`data.json?v=${Date.now()}`);
+        const rawUrl = 'https://raw.githubusercontent.com/syunpa1944/GovBenefit_Hunter/main/data.json';
+        const response = await fetch(`${rawUrl}?v=${Date.now()}`);
         benefitsData = await response.json();
         render();
         updateDashboard();
