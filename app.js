@@ -14,10 +14,8 @@ async function loadBenefitsData() {
     updateDashboard();
 
     try {
-        // 로컬 경로가 아닌 깃허브 실시간 무료 클라우드 저장소(자동 수집본) URL 주소 연동
-        // 캐시 버스팅 적용 (?v= 타임스탬프)으로 브라우저 구버전 캐싱 완벽 우회 강제 적용
-        const rawUrl = 'https://raw.githubusercontent.com/syunpa1944/GovBenefit_Hunter/main/data.json';
-        const response = await fetch(`${rawUrl}?v=${Date.now()}`);
+        // 캐시 버스팅 적용 (?v= 타임스탬프)으로 브라우저 구버전 캐싱 완벽 우회 강제 적용하며 토스 미니앱 내부 패키지의 상대 경로를 호출합니다.
+        const response = await fetch(`data.json?v=${Date.now()}`);
         benefitsData = await response.json();
         render();
         updateDashboard();
@@ -637,6 +635,11 @@ function openSheet(dateStr, items) {
 function closeSheet() {
     document.getElementById('bottomSheet').classList.remove('open');
     document.getElementById('overlay').classList.remove('visible');
+    // 사용자가 혜택 창을 닫는 순간 화면 요소(DOM) 내부의 혜택 및 상세 주소 데이터들을 강제 소멸시켜 불법 열람을 전면 차단
+    setTimeout(() => {
+        const list = document.getElementById('cardList');
+        if (list) list.innerHTML = '';
+    }, 300);
 }
 
 function openExternal(url) {
