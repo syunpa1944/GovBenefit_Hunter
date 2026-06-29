@@ -9,6 +9,29 @@ let barrierData = [];  // 무장애 시설 (필터 시 전국 상시 노출)
 let petData = [];      // 반려동물 동반 시설 (필터 시 전국 상시 노출)
 let activeFilters = [];
 
+let usedBenefits = [];
+if (typeof localStorage !== 'undefined') {
+    usedBenefits = JSON.parse(localStorage.getItem('usedBenefits') || '[]');
+}
+let currentOpenedSheetDate = null;
+let currentOpenedSheetItems = null;
+
+function toggleBenefitUsed(name) {
+    const idx = usedBenefits.indexOf(name);
+    if (idx > -1) {
+        usedBenefits.splice(idx, 1);
+    } else {
+        usedBenefits.push(name);
+    }
+    if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('usedBenefits', JSON.stringify(usedBenefits));
+    }
+    updateDashboard();
+    if (currentOpenedSheetDate && currentOpenedSheetItems) {
+        openSheet(currentOpenedSheetDate, currentOpenedSheetItems);
+    }
+}
+
 
 // 지도 주소 텍스트 기반 시도/시군구 동적 매핑 전처리기
 function preprocessDataByAddress() {
@@ -303,6 +326,7 @@ async function loadBenefitsData() {
 
 function updateDashboard() {
     let totalMaxAmount = 0;
+    let usedAmount = 0;
     const addedBenefits = new Set(); // 상세 혜택(b.name) 기준 중복 차단 집합
     const addedTitles = new Set();   // 단독 행사 타이틀 기준 중복 차단 집합
     
@@ -324,9 +348,6 @@ function updateDashboard() {
                 // 1단계: benefits 배열이 있으면 각 상세 혜택별로 유니크하게 파싱하여 합산
                 if (item.benefits && item.benefits.length > 0) {
                     item.benefits.forEach(b => {
-                        // 동일한 혜택명이 이미 계산되었다면 즉시 중복 합산 차단
-                        if (addedBenefits.has(b.name)) return;
-
                         const targetText = (b.name + " " + b.desc).replace(/,/g, '');
                         let parsedVal = 0;
 
@@ -344,14 +365,21 @@ function updateDashboard() {
                         }
 
                         if (parsedVal > 0) {
-                            totalMaxAmount += parsedVal;
-                            addedBenefits.add(b.name);
+                            if (usedBenefits.includes(b.name)) {
+                                if (!addedBenefits.has(b.name)) {
+                                    usedAmount += parsedVal;
+                                    addedBenefits.add(b.name);
+                                }
+                            } else {
+                                if (!addedBenefits.has(b.name)) {
+                                    totalMaxAmount += parsedVal;
+                                    addedBenefits.add(b.name);
+                                }
+                            }
                         }
                     });
                 } else if (item.amount) {
                     // 2단계: benefits가 없는 단독 혜택인 경우, 행사 타이틀 기준으로 중복을 체크해 합산
-                    if (addedTitles.has(item.title)) return;
-
                     const cleanAmountStr = item.amount.replace(/%/g, 'percent').replace(/,/g, '');
                     let parsedVal = 0;
 
@@ -374,8 +402,17 @@ function updateDashboard() {
                     }
 
                     if (parsedVal > 0) {
-                        totalMaxAmount += parsedVal;
-                        addedTitles.add(item.title);
+                        if (usedBenefits.includes(item.title)) {
+                            if (!addedTitles.has(item.title)) {
+                                usedAmount += parsedVal;
+                                addedTitles.add(item.title);
+                            }
+                        } else {
+                            if (!addedTitles.has(item.title)) {
+                                totalMaxAmount += parsedVal;
+                                addedTitles.add(item.title);
+                            }
+                        }
                     }
                 }
             }
@@ -384,8 +421,12 @@ function updateDashboard() {
 
     const displayEl = document.getElementById('totalBenefitDisplay');
     if (displayEl) {
-        if (totalMaxAmount > 0) {
-            displayEl.innerText = `최대 ${totalMaxAmount.toLocaleString()}원 💸`;
+        if (totalMaxAmount > 0 || usedAmount > 0) {
+            let label = `최대 ${totalMaxAmount.toLocaleString()}원 남음`;
+            if (usedAmount > 0) {
+                label += ` (사용 완료 ${usedAmount.toLocaleString()}원)`;
+            }
+            displayEl.innerText = `${label} 💸`;
         } else {
             displayEl.innerText = `최대 0원 💸`;
         }
@@ -740,6 +781,8 @@ function changeMonth(step) {
 }
 
 function openSheet(dateStr, items) {
+    currentOpenedSheetDate = dateStr;
+    currentOpenedSheetItems = items;
     const [y, m, d] = dateStr.split('-');
     const list = document.getElementById('cardList');
 
@@ -816,15 +859,21 @@ function openSheet(dateStr, items) {
             benefitsRowsHtml = `
                 <div class="benefits-section">
                     <div class="benefits-section-title">🎟️ 이 행사에서 쓸 수 있는 혜택</div>
-                    ${item.benefits.map(b => `
-                        <div class="linked-benefit-row">
-                            <div class="linked-benefit-info">
-                                <div class="linked-benefit-name">💸 ${b.name}</div>
+                    ${item.benefits.map(b => {
+                        const isUsed = usedBenefits.includes(b.name);
+                        return `
+                        <div class="linked-benefit-row" style="${isUsed ? 'opacity:0.6;background:var(--toss-grey-100);' : ''}">
+                            <input type="checkbox" ${isUsed ? 'checked' : ''} 
+                                onclick="event.stopPropagation(); toggleBenefitUsed('${b.name}')" 
+                                style="width:16px;height:16px;cursor:pointer;accent-color:var(--toss-blue);flex-shrink:0;margin-right:8px;" />
+                            <div class="linked-benefit-info" style="flex:1;">
+                                <div class="linked-benefit-name" style="${isUsed ? 'text-decoration:line-through;color:var(--toss-grey-600);' : ''}">💸 ${b.name}</div>
                                 <div class="linked-benefit-desc">${b.desc}</div>
                             </div>
-                            <button class="linked-benefit-btn" onclick="openExternal('${b.link}')">신청</button>
+                            <button class="linked-benefit-btn" onclick="openExternal('${b.link}')" ${isUsed ? 'disabled style="background:var(--toss-grey-300);color:var(--toss-grey-500);cursor:not-allowed;"' : ''}>신청</button>
                         </div>
-                    `).join('')}
+                        `;
+                    }).join('')}
                 </div>
             `;
         }
@@ -895,6 +944,8 @@ function toggleDetail(idx) {
 function closeSheet() {
     document.getElementById('bottomSheet').classList.remove('open');
     document.getElementById('overlay').classList.remove('visible');
+    currentOpenedSheetDate = null;
+    currentOpenedSheetItems = null;
 }
 
 function openExternal(url) {
