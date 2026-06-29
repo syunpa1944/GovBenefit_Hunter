@@ -5,25 +5,114 @@ let currentMonth = FIXED_TODAY.getMonth();
 
 const todayStr = "2026-06-25";
 let benefitsData = {};
+let barrierData = [];  // 무장애 시설 (필터 시 전국 상시 노출)
+let petData = [];      // 반려동물 동반 시설 (필터 시 전국 상시 노출)
 let activeFilters = [];
+
+
+// 지도 주소 텍스트 기반 시도/시군구 동적 매핑 전처리기
+function preprocessDataByAddress() {
+    const sidoNameKeys = {};
+    Object.keys(AREA_MAP).forEach(code => {
+        const name = AREA_MAP[code].name;
+        sidoNameKeys[name] = code;
+    });
+
+    const processItem = (item) => {
+        if (!item.mapUrl) return;
+        try {
+            const urlObj = new URL(item.mapUrl);
+            const query = urlObj.searchParams.get('query');
+            if (!query) return;
+
+            const decodedAddr = decodeURIComponent(query).trim();
+            const parts = decodedAddr.split(/\s+/);
+            if (parts.length === 0) return;
+
+            const firstPart = parts[0]; 
+            const secondPart = parts.length > 1 ? parts[1] : ""; 
+
+            let foundSidoCode = null;
+            let foundSidoName = "";
+
+            for (const name of Object.keys(sidoNameKeys)) {
+                if (firstPart.includes(name) || name.includes(firstPart)) {
+                    foundSidoCode = sidoNameKeys[name];
+                    foundSidoName = name;
+                    break;
+                }
+            }
+
+            if (foundSidoCode) {
+                item.areaCd = parseInt(foundSidoCode);
+                item.areaNm = foundSidoName;
+
+                if (secondPart) {
+                    const sigungus = AREA_MAP[foundSidoCode].sigungu;
+                    let foundSigunguCode = null;
+                    let foundSigunguName = "";
+
+                    for (const sCode of Object.keys(sigungus)) {
+                        const sName = sigungus[sCode];
+                        if (secondPart.includes(sName) || sName.includes(secondPart)) {
+                            foundSigunguCode = sCode;
+                            foundSigunguName = sName;
+                            break;
+                        }
+                    }
+
+                    if (foundSigunguCode) {
+                        item.sigunguCd = parseInt(foundSigunguCode);
+                        item.sigunguNm = foundSigunguName;
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn("주소 파싱 오류:", e, item.title);
+        }
+    };
+
+    Object.values(benefitsData).forEach(dayItems => {
+        dayItems.forEach(processItem);
+    });
+
+    barrierData.forEach(processItem);
+    petData.forEach(processItem);
+}
 
 // data.json에서 데이터를 한 번만 로드하여 트래픽 0으로 내부 메모리 캐싱 및 무제한 재사용
 async function loadBenefitsData() {
-    // 뼈대를 가장 먼저 렌더링
+    // 1단계: 빈 뼈대와 달력 그리드를 즉시 렌더링하여 모바일 웹뷰 ANR 타임아웃을 차단합니다.
     render();
     updateDashboard();
 
-    try {
-        // 캐시 버스팅 적용 (?v= 타임스탬프)으로 브라우저 구버전 캐싱 완벽 우회 강제 적용하며 토스 미니앱 내부 패키지의 상대 경로를 호출합니다.
-        const response = await fetch(`data.json?v=${Date.now()}`);
-        benefitsData = await response.json();
+    // 2단계: 대용량 공공데이터가 내장된 data.js 파일을 백그라운드 비동기로 로드합니다.
+    const script = document.createElement('script');
+    script.src = 'data.js';
+    script.async = true;
+
+    script.onload = () => {
+        console.log("공공데이터 실데이터 패키지 비동기 적재 성공.");
+        if (window.BENEFITS_DATA && Object.keys(window.BENEFITS_DATA).length > 0) {
+            const raw = window.BENEFITS_DATA;
+            // 무장애 및 반려동물 메타데이터 분리 탑재
+            barrierData = raw["__barrier__"] || [];
+            petData = raw["__pet__"] || [];
+            // 순수 날짜 데이터만 할당
+            benefitsData = Object.fromEntries(
+                Object.entries(raw).filter(([k]) => !k.startsWith('__'))
+            );
+        }
+        preprocessDataByAddress(); // 주소 기반 행정구역 분류 정합성 보정 기동!
         render();
         updateDashboard();
-    } catch (error) {
-        console.warn("로컬 브라우저 보안 정책(CORS)으로 data.json 호출이 차단되어 내장 백업 데이터를 주입합니다.");
+    };
+
+    script.onerror = (err) => {
+        console.warn("data.js 비동기 로딩 실패. 백업 데이터를 대체 탑재합니다.", err);
         // 로컬 실행(더블 클릭) 대비 완벽한 백업 데이터 주입
         benefitsData = {
-          "2026-06-25": [
+            "2026-06-25": [
             {
               "id": 2000,
               "title": "대한민국 숙박세일 페스타",
@@ -206,7 +295,10 @@ async function loadBenefitsData() {
         };
         render();
         updateDashboard();
-    }
+    };
+
+    // 3단계: 준비된 스크립트 엘리먼트를 실제 DOM에 삽입하여 비동기 다운로드 및 적재를 기동합니다.
+    document.head.appendChild(script);
 }
 
 function updateDashboard() {
@@ -219,29 +311,65 @@ function updateDashboard() {
             // 동일한 타이틀의 혜택이 여러 날짜에 노출될 때 중복 합산 차단
             if (addedTitles.has(item.title)) return;
 
-            // 필터 및 지역 조건 부합 여부 확인
-            const isTypeMatch = activeFilters.length === 0 || activeFilters.every(f => (item.tags || []).includes(f));
+            // 다중 필터 선택 시 OR(또는) 조건 및 교차 결합 지원
+            const isTypeMatch = activeFilters.length === 0 || activeFilters.some(f => (item.tags || []).includes(f));
             let isAreaMatch = true;
-            if (selectedSido !== "0" && item.areaCd !== 0) {
+            if (selectedSido !== "0") {
+                // 주소 파싱으로 areaCd가 올바르게 재매핑되어 100% 보장됨
                 isAreaMatch = String(item.areaCd) === selectedSido;
             }
-            if (selectedSigungu !== "0" && item.areaCd !== 0) {
+            if (selectedSigungu !== "0") {
                 isAreaMatch = String(item.sigunguCd) === selectedSigungu;
             }
 
             if (isTypeMatch && isAreaMatch && !item.isAd) {
-                // "50,000원", "100,000원" 등에서 순수 원화 금액만 추출하기 위한 정밀 필터링
-                // % 할인율(예: 30%, 50% 할인)은 지원금 합산에서 제외
-                const cleanAmountStr = item.amount.replace(/%/g, 'percent');
-                const numberMatch = cleanAmountStr.replace(/,/g, '').match(/\d+/g);
-                if (numberMatch) {
-                    const amounts = numberMatch
-                        .map(Number)
-                        .filter(val => val >= 1000); // 1000원 이상의 실질 지원금 액수만 취합 (30, 50 같은 단일 숫자 배제)
-                    if (amounts.length > 0) {
-                        totalMaxAmount += Math.max(...amounts); // 범위 액수 중 최대액 취합
-                        addedTitles.add(item.title);
+                let maxBenefitVal = 0;
+
+                // 1단계: benefits 배열이 있으면 각 상세 혜택 텍스트에서 금액 파싱
+                if (item.benefits && item.benefits.length > 0) {
+                    item.benefits.forEach(b => {
+                        const targetText = (b.name + " " + b.desc).replace(/,/g, '');
+                        // "20만원", "13만원" 등의 만원 패턴 매칭
+                        const manwonMatch = targetText.match(/(\d+)\s*만/);
+                        if (manwonMatch) {
+                            const val = parseInt(manwonMatch[1]) * 10000;
+                            if (val > maxBenefitVal) maxBenefitVal = val;
+                        } else {
+                            // "30000원", "30,000원" 등의 일반 원화 패턴 매칭
+                            const wonMatch = targetText.match(/(\d+)\s*원/);
+                            if (wonMatch) {
+                                const val = parseInt(wonMatch[1]);
+                                if (val >= 1000 && val > maxBenefitVal) maxBenefitVal = val;
+                            }
+                        }
+                    });
+                }
+
+                // 2단계: benefits가 없거나 금액을 추출하지 못한 경우 amount 텍스트에서 백업 파싱
+                if (maxBenefitVal === 0 && item.amount) {
+                    const cleanAmountStr = item.amount.replace(/%/g, 'percent').replace(/,/g, '');
+                    const manwonMatch = cleanAmountStr.match(/(\d+)\s*만/);
+                    if (manwonMatch) {
+                        maxBenefitVal = parseInt(manwonMatch[1]) * 10000;
+                    } else {
+                        const wonMatch = cleanAmountStr.match(/(\d+)\s*원/);
+                        if (wonMatch) {
+                            const val = parseInt(wonMatch[1]);
+                            if (val >= 1000) maxBenefitVal = val;
+                        } else {
+                            // 단순 숫자 추출 백업
+                            const numbers = cleanAmountStr.match(/\d+/g);
+                            if (numbers) {
+                                const val = Math.max(...numbers.map(Number));
+                                if (val >= 1000) maxBenefitVal = val;
+                            }
+                        }
                     }
+                }
+
+                if (maxBenefitVal > 0) {
+                    totalMaxAmount += maxBenefitVal;
+                    addedTitles.add(item.title);
                 }
             }
         });
@@ -484,7 +612,7 @@ function render() {
         // 1차 필터링: 태그(유형) 필터
         let filtered = activeFilters.length === 0 
             ? dayData 
-            : dayData.filter(item => activeFilters.every(f => (item.tags || []).includes(f)));
+            : dayData.filter(item => activeFilters.some(f => (item.tags || []).includes(f)));
 
         // 2차 필터링: 시/도 및 군/구 행정구역 다단계 필터링 적용
         if (selectedSido !== "0") {
@@ -502,25 +630,65 @@ function render() {
         }
 
         if (filtered.length > 0) {
-            // 혼잡도 정보를 바탕으로 하단 미니바 생성
+            // 혼잡도 정보를 바탕으로 하단 미니바 및 셀 배경색상 융합
             const mainItem = filtered[0];
             if (mainItem.congestion) {
                 const bar = document.createElement('div');
                 bar.className = 'congestion-bar';
                 let barColor = 'var(--congestion-green)';
-                if (mainItem.congestion === 'yellow') barColor = 'var(--congestion-yellow)';
-                if (mainItem.congestion === 'red') barColor = 'var(--congestion-red)';
+                let cellBg = 'rgba(52, 199, 89, 0.07)'; // 여유: 파스텔 연초록
+                
+                if (mainItem.congestion === 'yellow') {
+                    barColor = 'var(--congestion-yellow)';
+                    cellBg = 'rgba(255, 149, 0, 0.07)'; // 보통: 파스텔 연노랑
+                } else if (mainItem.congestion === 'red') {
+                    barColor = 'var(--congestion-red)';
+                    cellBg = 'rgba(255, 59, 48, 0.07)'; // 혼잡: 파스텔 연분홍
+                }
+                
                 bar.style.backgroundColor = barColor;
                 cell.appendChild(bar);
+                
+                // 오늘 날짜가 아닐 때만 혼잡도 파스텔 배경 색상을 주입하여 가독성을 높입니다.
+                if (dateStr !== todayStr) {
+                    cell.style.backgroundColor = cellBg;
+                    cell.style.borderColor = barColor;
+                }
             }
 
-            // 대표 혜택 요약 텍스트 추가
-            const amountText = document.createElement('div');
-            amountText.className = 'cell-amount';
-            // 가장 액수가 큰 혜택 또는 무료 여부 우선 표시
-            const benefitItem = filtered.find(item => !item.isAd) || filtered[0];
-            amountText.innerText = benefitItem.type;
-            cell.appendChild(amountText);
+            // 달력 셀: 아이콘(이모지)만 표시해 직관적 색상 컬러 부여
+            const iconWrap = document.createElement('div');
+            iconWrap.style.cssText = 'margin-top:3px; display:flex; flex-wrap:wrap; gap:1px; justify-content:center; padding:0 1px;';
+
+            // 해당 날짜 아이템들의 태그를 모아 유니크 이모지 세트 생성
+            const emojiMap = {
+                "festival": "🎉", "water": "🌊", "free": "🎫",
+                "benefit": "💸", "payback": "💵", "eco": "🌿",
+                "barrier": "♿", "pet": "🐶", "camp": "🏕️", "stroller": "🧒"
+            };
+            const uniqueEmojis = new Set();
+            filtered.forEach(item => {
+                (item.tags || []).forEach(t => {
+                    if (emojiMap[t]) uniqueEmojis.add(emojiMap[t]);
+                });
+            });
+
+            const emojiArr = Array.from(uniqueEmojis).slice(0, 4);
+            emojiArr.forEach(em => {
+                const span = document.createElement('span');
+                span.style.cssText = 'font-size:9px; line-height:1;';
+                span.textContent = em;
+                iconWrap.appendChild(span);
+            });
+
+            // 아이템 수 표시 (작은 숫자 뱃지)
+            if (filtered.length > 0) {
+                const badge = document.createElement('div');
+                badge.style.cssText = 'font-size:7px; color:#0064FF; font-weight:700; width:100%; text-align:center; margin-top:1px;';
+                badge.textContent = `${filtered.length}건`;
+                iconWrap.appendChild(badge);
+            }
+            cell.appendChild(iconWrap);
 
             cell.onclick = () => openSheet(dateStr, filtered);
         } else {
@@ -566,20 +734,31 @@ function changeMonth(step) {
 
 function openSheet(dateStr, items) {
     const [y, m, d] = dateStr.split('-');
-    document.getElementById('sheetTitle').innerText = `${parseInt(m)}월 ${parseInt(d)}일 혜택 및 여행`;
     const list = document.getElementById('cardList');
-    
+
+    // 이미 render()에서 필터링되어 넘어온 로컬 행사 목록
+    let displayItems = [...items];
+
+    // 팝업 리스트에서 전국 공통 혜택(areaCd === 0) 카드 단독 노출 제거 
+    // (오직 실제 행사/축제 카드만 리스트에 나오고, 공통 혜택은 상세보기 안에만 조인되어 제공됨)
+    displayItems = displayItems.filter(item => item.areaCd !== 0);
+
+    // 중복 제거 (제목 기준)
+    const seenTitles = new Set();
+    displayItems = displayItems.filter(item => {
+        if (seenTitles.has(item.title)) return false;
+        seenTitles.add(item.title);
+        return true;
+    });
+
+    document.getElementById('sheetTitle').innerText = `${parseInt(m)}월 ${parseInt(d)}일 행사 및 일정 (${displayItems.length}건)`;
+
     // 영어 태그를 한글로 치환하는 맵 정의
     const tagTranslation = {
-        "benefit": "정부지원금",
-        "payback": "지자체환급",
-        "free": "무료입장",
-        "eco": "생태관광",
-        "barrier": "무장애여행",
-        "pet": "반려동물동반",
-        "camp": "야영장",
-        "stroller": "유모차반입",
-        "wheelchair": "휠체어이용"
+        "benefit": "정부지원금", "payback": "지자체환급", "free": "무료입장",
+        "festival": "축제/공연/행사", "eco": "생태관광", "barrier": "무장애여행",
+        "pet": "반려동물동반", "camp": "야영장", "stroller": "유모차반입",
+        "wheelchair": "휠체어이용", "water": "물놀이/수영장"
     };
     
     // 토스 애즈 연동 테스트용 프리미엄 골드 네이티브 제휴 혜택 카드 객체 정의
@@ -589,42 +768,107 @@ function openSheet(dateStr, items) {
             <div class="card-tags">
                 <span class="tag-badge" style="border-color:#e5e5e5; color:#6b7684">#전국 공통</span>
                 <span class="tag-badge tag-ad">#TossAds제휴</span>
-                <span class="tag-badge tag-ad">#특별할인</span>
             </div>
             <div class="card-title">[Toss Ads] 전국 여행 지원 웰컴 제휴 할인 쿠폰</div>
             <div class="card-amount ad-amount">렌터카 & 숙박 최대 20% 즉시 할인</div>
-            <div class="card-desc">토스 애즈와 공식 제휴된 안전한 여행 할인 쿠폰입니다. 렌터카 예약 및 지정 제휴처 숙박 이용 시 최대 20% 즉시 할인 혜택을 드립니다.</div>
             <button class="card-btn gold-btn" onclick="openExternal('https://developers-apps-in-toss.toss.im')">
                 제휴쿠폰 받기
             </button>
         </div>
     `;
 
-    const cardListArray = items.map(item => `
-        <div class="benefit-card">
-            <div class="card-tags">
-                <span class="tag-badge" style="border-color:#e5e5e5; color:#6b7684">#${item.areaNm} ${item.sigunguNm}</span>
-                ${(item.tags || []).map(t => {
-                    const translated = tagTranslation[t.toLowerCase()] || t;
-                    return `<span class="tag-badge">#${translated}</span>`;
-                }).join('')}
+    const cardListArray = displayItems.map((item, idx) => {
+        const isLocal = item.areaCd !== 0;
+        const isWater = /물놀이|수영장|분수|풀장/.test(item.title);
+        const borderClass = isLocal ? (isWater ? 'water-card' : 'local-gov-card') : 'tour-card';
+
+        // 대표 태그 이모지 (한 개)
+        const tags = item.tags || [];
+        const typeEmoji = tags.includes('water') ? '🌊'
+            : tags.includes('festival') ? '🎉'
+            : tags.includes('barrier') ? '♿'
+            : tags.includes('pet') ? '🐶'
+            : tags.includes('camp') ? '🏕️'
+            : tags.includes('free') ? '🎫'
+            : tags.includes('benefit') ? '💸'
+            : '🎁';
+
+        // 지역 라벨
+        const regionLabel = (item.areaNm || '전국') + (item.sigunguNm ? ' ' + item.sigunguNm : '');
+
+        // === 상세 영역 HTML (숨김 상태로 시작) ===
+        // 혜택 신청 링크: benefits 배열 첫 번째 공식 URL 사용 (네이버 검색 대신 실제 사이트로)
+        const firstBenefitLink = (item.benefits && item.benefits.length > 0) ? item.benefits[0].link : '';
+        const mainLink = firstBenefitLink || item.benefitLink || '';
+        const mapBtnHtml = item.mapUrl
+            ? `<button class="card-btn" style="flex:1;background:var(--toss-grey-100);color:var(--toss-grey-800);border:1px solid var(--toss-grey-600);width:auto;" onclick="openExternal('${item.mapUrl}')">📍 지도보기</button>`
+            : '';
+
+        let benefitsRowsHtml = '';
+        if (item.benefits && item.benefits.length > 0 && isLocal) {
+            benefitsRowsHtml = `
+                <div class="benefits-section">
+                    <div class="benefits-section-title">🎟️ 이 행사에서 쓸 수 있는 혜택</div>
+                    ${item.benefits.map(b => `
+                        <div class="linked-benefit-row">
+                            <div class="linked-benefit-info">
+                                <div class="linked-benefit-name">💸 ${b.name}</div>
+                                <div class="linked-benefit-desc">${b.desc}</div>
+                            </div>
+                            <button class="linked-benefit-btn" onclick="openExternal('${b.link}')">신청</button>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        // 행사 신청 버튼 딱 1개만 정의 (중복 다중 버튼 제거)
+        let applyBtnsHtml = '';
+        if (mainLink) {
+            applyBtnsHtml = `<button class="card-btn" style="flex:1.8;width:auto;" onclick="openExternal('${mainLink}')">행사 신청</button>`;
+        }
+
+        const detailHtml = `
+            <div id="detail-${idx}" class="card-detail" style="display:none;margin-top:10px;">
+                ${item.period && item.period !== '상시 운영' ? `<div class="card-period">📅 ${item.period}</div>` : ''}
+                ${benefitsRowsHtml}
+                ${applyBtnsHtml || mainLink ? `
+                <div style="display:flex;flex-wrap:wrap;gap:6px;width:100%;margin-top:10px;">
+                    ${applyBtnsHtml}
+                    ${mapBtnHtml}
+                </div>` : mapBtnHtml ? `<div style="display:flex;gap:8px;width:100%;margin-top:10px;">${mapBtnHtml}</div>` : ''}
             </div>
-            <div class="card-title">${item.title}</div>
-            <div class="card-amount">${item.amount}</div>
-            <div class="card-desc">${item.note}</div>
-            <button class="card-btn" onclick="openExternal('${item.source}')">
-                혜택 신청하러 가기
-            </button>
-        </div>
-    `);
+        `;
+
+        // === 간략 카드 (기본 표시) ===
+        return `
+            <div class="benefit-card ${borderClass}">
+                <div style="display:flex;align-items:flex-start;gap:10px;">
+                    <div style="font-size:22px;flex-shrink:0;line-height:1.2;">${typeEmoji}</div>
+                    <div style="flex:1;min-width:0;">
+                        <div style="font-size:10px;color:var(--toss-grey-600);margin-bottom:3px;">#${regionLabel}
+                            ${tags.slice(0,2).map(t => `<span style="margin-left:4px;">#${tagTranslation[t]||t}</span>`).join('')}
+                        </div>
+                        <div class="card-title" style="padding-right:0;">${item.title}</div>
+                        <div class="card-amount" style="font-size:12px;margin-bottom:0;">${item.amount || ''}</div>
+                    </div>
+                    <button onclick="toggleDetail(${idx})" id="toggle-btn-${idx}"
+                        style="flex-shrink:0;height:30px;padding:0 10px;background:var(--toss-grey-100);border:1px solid var(--toss-grey-600);border-radius:8px;font-size:11px;font-weight:700;color:var(--toss-grey-800);cursor:pointer;white-space:nowrap;">
+                        상세보기
+                    </button>
+                </div>
+                ${detailHtml}
+            </div>
+        `;
+    });
 
     // 카드 목록 중간 임의의 위치(랜덤 인덱스)에 광고 카드를 유려하게 주입
-    // 리스트가 비어있을 때는 첫 번째에, 데이터가 있을 때는 0 ~ length 범위의 무작위 위치로 융합
-    const insertIndex = cardListArray.length > 0 
-        ? Math.floor(Math.random() * (cardListArray.length + 1)) 
-        : 0;
-        
-    cardListArray.splice(insertIndex, 0, adCardHtml);
+    if (cardListArray.length > 0) {
+        const insertIndex = Math.floor(Math.random() * (cardListArray.length + 1));
+        cardListArray.splice(insertIndex, 0, adCardHtml);
+    } else {
+        cardListArray.push(adCardHtml);
+    }
     
     list.innerHTML = cardListArray.join('');
     
@@ -632,14 +876,18 @@ function openSheet(dateStr, items) {
     document.getElementById('overlay').classList.add('visible');
 }
 
+function toggleDetail(idx) {
+    const detail = document.getElementById(`detail-${idx}`);
+    const btn = document.getElementById(`toggle-btn-${idx}`);
+    if (!detail) return;
+    const isOpen = detail.style.display !== 'none';
+    detail.style.display = isOpen ? 'none' : 'block';
+    btn.textContent = isOpen ? '상세보기' : '닫기';
+}
+
 function closeSheet() {
     document.getElementById('bottomSheet').classList.remove('open');
     document.getElementById('overlay').classList.remove('visible');
-    // 사용자가 혜택 창을 닫는 순간 화면 요소(DOM) 내부의 혜택 및 상세 주소 데이터들을 강제 소멸시켜 불법 열람을 전면 차단
-    setTimeout(() => {
-        const list = document.getElementById('cardList');
-        if (list) list.innerHTML = '';
-    }, 300);
 }
 
 function openExternal(url) {
