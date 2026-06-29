@@ -303,14 +303,12 @@ async function loadBenefitsData() {
 
 function updateDashboard() {
     let totalMaxAmount = 0;
-    const addedTitles = new Set(); // 중복 합산 방지를 위한 식별자 집합
+    const addedBenefits = new Set(); // 상세 혜택(b.name) 기준 중복 차단 집합
+    const addedTitles = new Set();   // 단독 행사 타이틀 기준 중복 차단 집합
     
     // 활성화된 필터 조건에 부합하는 모든 혜택들의 금액 시뮬레이션 계산
     Object.values(benefitsData).forEach(dayItems => {
         dayItems.forEach(item => {
-            // 동일한 타이틀의 혜택이 여러 날짜에 노출될 때 중복 합산 차단
-            if (addedTitles.has(item.title)) return;
-
             // 다중 필터 선택 시 OR(또는) 조건 및 교차 결합 지원
             const isTypeMatch = activeFilters.length === 0 || activeFilters.some(f => (item.tags || []).includes(f));
             let isAreaMatch = true;
@@ -323,53 +321,62 @@ function updateDashboard() {
             }
 
             if (isTypeMatch && isAreaMatch && !item.isAd) {
-                let maxBenefitVal = 0;
-
-                // 1단계: benefits 배열이 있으면 각 상세 혜택 텍스트에서 금액 파싱
+                // 1단계: benefits 배열이 있으면 각 상세 혜택별로 유니크하게 파싱하여 합산
                 if (item.benefits && item.benefits.length > 0) {
                     item.benefits.forEach(b => {
+                        // 동일한 혜택명이 이미 계산되었다면 즉시 중복 합산 차단
+                        if (addedBenefits.has(b.name)) return;
+
                         const targetText = (b.name + " " + b.desc).replace(/,/g, '');
+                        let parsedVal = 0;
+
                         // "20만원", "13만원" 등의 만원 패턴 매칭
                         const manwonMatch = targetText.match(/(\d+)\s*만/);
                         if (manwonMatch) {
-                            const val = parseInt(manwonMatch[1]) * 10000;
-                            if (val > maxBenefitVal) maxBenefitVal = val;
+                            parsedVal = parseInt(manwonMatch[1]) * 10000;
                         } else {
                             // "30000원", "30,000원" 등의 일반 원화 패턴 매칭
                             const wonMatch = targetText.match(/(\d+)\s*원/);
                             if (wonMatch) {
                                 const val = parseInt(wonMatch[1]);
-                                if (val >= 1000 && val > maxBenefitVal) maxBenefitVal = val;
+                                if (val >= 1000) parsedVal = val;
                             }
                         }
-                    });
-                }
 
-                // 2단계: benefits가 없거나 금액을 추출하지 못한 경우 amount 텍스트에서 백업 파싱
-                if (maxBenefitVal === 0 && item.amount) {
+                        if (parsedVal > 0) {
+                            totalMaxAmount += parsedVal;
+                            addedBenefits.add(b.name);
+                        }
+                    });
+                } else if (item.amount) {
+                    // 2단계: benefits가 없는 단독 혜택인 경우, 행사 타이틀 기준으로 중복을 체크해 합산
+                    if (addedTitles.has(item.title)) return;
+
                     const cleanAmountStr = item.amount.replace(/%/g, 'percent').replace(/,/g, '');
+                    let parsedVal = 0;
+
                     const manwonMatch = cleanAmountStr.match(/(\d+)\s*만/);
                     if (manwonMatch) {
-                        maxBenefitVal = parseInt(manwonMatch[1]) * 10000;
+                        parsedVal = parseInt(manwonMatch[1]) * 10000;
                     } else {
                         const wonMatch = cleanAmountStr.match(/(\d+)\s*원/);
                         if (wonMatch) {
                             const val = parseInt(wonMatch[1]);
-                            if (val >= 1000) maxBenefitVal = val;
+                            if (val >= 1000) parsedVal = val;
                         } else {
                             // 단순 숫자 추출 백업
                             const numbers = cleanAmountStr.match(/\d+/g);
                             if (numbers) {
                                 const val = Math.max(...numbers.map(Number));
-                                if (val >= 1000) maxBenefitVal = val;
+                                if (val >= 1000) parsedVal = val;
                             }
                         }
                     }
-                }
 
-                if (maxBenefitVal > 0) {
-                    totalMaxAmount += maxBenefitVal;
-                    addedTitles.add(item.title);
+                    if (parsedVal > 0) {
+                        totalMaxAmount += parsedVal;
+                        addedTitles.add(item.title);
+                    }
                 }
             }
         });
