@@ -227,8 +227,29 @@ def build_data():
         for area_code, templates in local_benefit_templates.items():
             area_info = AREA_MAP[area_code]
             for i, template in enumerate(templates):
+                # 템플릿의 기간 제한 파싱
+                period = template["period"]
+                is_in_range = True
+                if period != "상시 운영" and " ~ " in period:
+                    try:
+                        p_parts = period.split(" ~ ")
+                        p_start_str = p_parts[0].strip()
+                        p_end_str = p_parts[1].strip()
+                        
+                        # 연도가 생략된 경우 (예: "07.10") 2026 연도 보강
+                        if len(p_start_str.split('.')) == 2:
+                            p_start_str = f"2026.{p_start_str}"
+                        if len(p_end_str.split('.')) == 2:
+                            p_end_str = f"2026.{p_end_str}"
+                            
+                        start_lim = datetime.strptime(p_start_str, "%Y.%m.%d")
+                        end_lim = datetime.strptime(p_end_str, "%Y.%m.%d")
+                        is_in_range = start_lim <= curr_date <= end_lim
+                    except Exception as ex:
+                        is_in_range = True
+
                 # 혜택/행사가 고르게 날짜별로 활성화되도록 분산 노출
-                if (i + d) % 2 == 0:
+                if is_in_range and (i + d) % 2 == 0:
                     ac = int(area_code)
                     an = area_info["name"]
                     sc = int(template["sigunguCd"])
