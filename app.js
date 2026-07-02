@@ -1179,7 +1179,8 @@ function getRewardedShower() {
 
 function preloadRewardedAd() {
     const loader = getRewardedLoader();
-    if (!loader || !loader.isSupported()) {
+    if (!loader) return;
+    if (typeof loader.isSupported === 'function' && !loader.isSupported()) {
         return;
     }
     loader({
@@ -1198,7 +1199,10 @@ function preloadRewardedAd() {
 
 function tryShowRewardedAd() {
     const shower = getRewardedShower();
-    if (!rewardedAdLoaded || !shower || !shower.isSupported()) {
+    if (!rewardedAdLoaded || !shower) {
+        return false;
+    }
+    if (typeof shower.isSupported === 'function' && !shower.isSupported()) {
         return false;
     }
     shower({
