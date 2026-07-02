@@ -1165,25 +1165,11 @@ function attachTossBanner(containerId) {
 let rewardedAdLoaded = false;
 const REWARDED_AD_ID = 'ait.v2.live.be0a965d07e0432b'; // 실제 상용 출시용 리워드 광고 ID
 
-function getRewardedLoader() {
-    if (typeof loadRewardedAd !== 'undefined') return loadRewardedAd;
-    if (typeof TossAds !== 'undefined' && TossAds.loadRewardedAd) return TossAds.loadRewardedAd;
-    return null;
-}
-
-function getRewardedShower() {
-    if (typeof showRewardedAd !== 'undefined') return showRewardedAd;
-    if (typeof TossAds !== 'undefined' && TossAds.showRewardedAd) return TossAds.showRewardedAd;
-    return null;
-}
-
 function preloadRewardedAd() {
-    const loader = getRewardedLoader();
-    if (!loader) return;
-    if (typeof loader.isSupported === 'function' && !loader.isSupported()) {
+    if (typeof loadRewardedAd === 'undefined' || !loadRewardedAd.isSupported()) {
         return;
     }
-    loader({
+    loadRewardedAd({
         options: { adGroupId: REWARDED_AD_ID },
         onEvent: (event) => {
             if (event.type === 'loaded') {
@@ -1198,14 +1184,10 @@ function preloadRewardedAd() {
 }
 
 function tryShowRewardedAd() {
-    const shower = getRewardedShower();
-    if (!rewardedAdLoaded || !shower) {
+    if (!rewardedAdLoaded || typeof showRewardedAd === 'undefined' || !showRewardedAd.isSupported()) {
         return false;
     }
-    if (typeof shower.isSupported === 'function' && !shower.isSupported()) {
-        return false;
-    }
-    shower({
+    showRewardedAd({
         options: { adGroupId: REWARDED_AD_ID },
         onEvent: (event) => {
             switch (event.type) {
