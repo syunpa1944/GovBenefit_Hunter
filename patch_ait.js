@@ -5,9 +5,9 @@ const { AppsInTossBundle, PlatformType } = require('@apps-in-toss/ait-format');
 async function main() {
   console.log('Starting Corrected Binary Linker Patch on govbenefit-hunter.ait...');
   
-  const aitPath = 'govbenefit-hunter.ait';
+  const aitPath = process.argv[2] || 'govbenefit-hunter.ait';
   if (!fs.existsSync(aitPath)) {
-    throw new Error('Official govbenefit-hunter.ait not found! Please run trigger_build.js first.');
+    throw new Error(`Official .ait not found at path: ${aitPath}!`);
   }
 
   // 1. Read existing compliant bundle
@@ -75,9 +75,24 @@ async function main() {
     const hasRoot = fileCache[rootName] !== undefined;
     const hasWeb = fileCache[webName] !== undefined;
 
-    const sourceData = fileCache[webName] || fileCache[rootName];
+    let sourceData = fileCache[webName] || fileCache[rootName];
     if (!sourceData) {
-      console.warn(`Asset not found in original bundle: ${asset}`);
+      const possiblePaths = [
+        asset,
+        path.join('test-app', asset),
+        path.join('test-app/src', asset),
+        path.join('test-app/src', asset === 'style.css' ? 'App.css' : asset)
+      ];
+      for (const p of possiblePaths) {
+        if (fs.existsSync(p)) {
+          sourceData = fs.readFileSync(p);
+          console.log(`Loaded source data directly from local file: ${p}`);
+          break;
+        }
+      }
+    }
+    if (!sourceData) {
+      console.warn(`Asset not found in original bundle or local filesystem: ${asset}`);
       continue;
     }
 
