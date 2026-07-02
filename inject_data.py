@@ -29,17 +29,26 @@ global_benefits = [
     {
         "name": "정부 근로자 휴가지원금",
         "desc": "이 행사 방문 교통비/숙박비로 사용 가능 (최대 20만원 매칭 지원)",
-        "link": "https://vacation.visitkorea.or.kr/"
+        "link": "https://vacation.visitkorea.or.kr/",
+        "eligible": "company_vacation"
     },
     {
         "name": "문화누리카드",
         "desc": "저소득층 연 13만원 지원 카드 — 입장권·교통비·숙박 결제 가능",
-        "link": "https://www.mnuri.kr/"
+        "link": "https://www.mnuri.kr/",
+        "eligible": "low_income"
     },
     {
-        "name": "다자녀·장애인 무료/할인 입장",
-        "desc": "공식 축제·행사는 복지카드·다자녀카드 제시 시 입장료 면제 또는 50% 감면",
-        "link": "https://search.naver.com/search.naver?query=" + urllib.parse.quote("다자녀 혜택")
+        "name": "다자녀 가족 무료/할인 입장",
+        "desc": "공식 축제·행사는 다자녀카드 제시 시 입장료 면제 또는 50% 감면",
+        "link": "https://search.naver.com/search.naver?query=" + urllib.parse.quote("다자녀 혜택"),
+        "eligible": "multi_child"
+    },
+    {
+        "name": "장애인 무료/할인 입장",
+        "desc": "공식 축제·행사는 복지카드 제시 시 입장료 면제 또는 50% 감면",
+        "link": "https://search.naver.com/search.naver?query=" + urllib.parse.quote("장애인 복지카드 혜택"),
+        "eligible": "disabled"
     }
 ]
 
@@ -341,7 +350,18 @@ def build_data():
 
 if __name__ == "__main__":
     result = build_data()
-    target_file = r"C:\럭포마_개발자료\앱인토스\광고예상\data.json"
-    with open(target_file, 'w', encoding='utf-8') as f:
+    script_dir = os.path.dirname(__file__)
+
+    # data.js — app.js가 <script> 태그로 로드하는 파일
+    js_path = os.path.join(script_dir, "data.js")
+    with open(js_path, 'w', encoding='utf-8') as f:
+        f.write("window.BENEFITS_DATA = ")
         json.dump(result, f, ensure_ascii=False, indent=2)
-    print("SUCCESS: Comprehensive year-round data.json build complete.")
+        f.write(";\n")
+    print(f"SUCCESS: data.js written ({os.path.getsize(js_path):,} bytes)")
+
+    # data.json — 호환성 유지
+    json_path = os.path.join(script_dir, "data.json")
+    with open(json_path, 'w', encoding='utf-8') as f:
+        json.dump(result, f, ensure_ascii=False, indent=2)
+    print(f"SUCCESS: data.json written ({os.path.getsize(json_path):,} bytes)")

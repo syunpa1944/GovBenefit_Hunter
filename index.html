@@ -35,7 +35,7 @@
             document.documentElement.appendChild(div);
         });
     </script>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>정부 혜택 스마트 큐레이터</title>
     <style>
         :root {
@@ -86,8 +86,9 @@
         .dashboard-badge { background: rgba(255, 255, 255, 0.2); font-size: 11px; padding: 4px 8px; border-radius: 12px; font-weight: 600; }
 
         /* 헤더 */
-        .header { padding: 20px 16px 8px; background: var(--toss-white); position: sticky; top: 0; z-index: 10; }
-        .header h2 { font-size: 18px; font-weight: 700; margin: 0 0 12px; }
+        .header { padding: 20px 16px 8px; background: var(--toss-white); position: sticky; top: 0; z-index: 10; display: flex; flex-direction: column; width: 100%; }
+        .header h2 { font-size: 18px; font-weight: 700; margin: 0; }
+        .reward-display { font-size: 14px; font-weight: 600; color: #e74c3c; white-space: nowrap; }
         
         .filter-container { 
             display: grid; 
@@ -123,7 +124,7 @@
         .month-btn { cursor: pointer; padding: 8px 16px; font-size: 18px; color: var(--toss-grey-600); }
         .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; background: var(--toss-grey-100); border: 1px solid var(--toss-grey-100); border-radius: 12px; overflow: hidden; }
         .day-cell {
-            min-height: 80px; aspect-ratio: 1/1.2; background: var(--toss-white);
+            min-height: 80px; background: var(--toss-white);
             display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 8px 4px 6px;
             cursor: pointer; position: relative; font-size: 13px; font-weight: 600;
         }
@@ -214,7 +215,48 @@
         .linked-benefit-name { font-size: 12px; font-weight: 700; color: #1a1a2e; margin-bottom: 2px; }
         .linked-benefit-desc { font-size: 11px; color: var(--toss-grey-600); line-height: 1.3; }
         .linked-benefit-btn { flex-shrink: 0; height: 30px; padding: 0 10px; background: var(--toss-blue); color: white; border: none; border-radius: 8px; font-size: 11px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+
+        /* === 반응형: @media + clamp() 혼합 방식 === */
+        /* 작은 화면 (iPhone SE, < 360px) */
+        @media (max-width: 359px) {
+            .dashboard { padding: 16px 14px 16px; }
+            .dashboard-title { font-size: 20px; }
+            .dashboard-subtitle { font-size: 11px; }
+            .dashboard-helper { font-size: 10px; padding: 6px 10px; }
+            .header { padding: 14px 12px 6px; }
+            .header h2 { font-size: 16px; }
+            .reward-display { font-size: 12px; }
+            .filter-chip { font-size: 11px; padding: 8px 2px; gap: 2px; }
+            #filter-all { padding: 10px 10px; }
+            .day-cell { min-height: 60px; font-size: 11px; padding: 4px 2px 3px; }
+            .cell-amount { font-size: 7px; }
+            .day-cell.today { background: var(--toss-blue-light); }
+            .bottom-sheet { padding: 20px 12px; height: 85%; }
+            .benefit-card { padding: 14px; }
+            .card-title { font-size: 14px; }
+            .card-amount { font-size: 16px; }
+            .card-btn { height: 42px; font-size: 13px; }
+            .area-select { font-size: 11px; height: 36px; }
+        }
+        /* 중간 화면 (360px ~ 389px) */
+        @media (min-width: 360px) and (max-width: 389px) {
+            .dashboard-title { font-size: 22px; }
+            .filter-chip { font-size: 12px; padding: 9px 3px; }
+            .day-cell { min-height: 70px; font-size: 12px; }
+            .card-title { font-size: 15px; }
+        }
+        /* 유동 폰트/간격 (clamp) */
+        .dashboard-title { font-size: clamp(20px, 5.5vw, 26px); }
+        .header h2 { font-size: clamp(16px, 4vw, 20px); }
+        .filter-chip { font-size: clamp(11px, 3.2vw, 14px); }
+        .day-cell { font-size: clamp(11px, 3vw, 14px); min-height: clamp(60px, 18vw, 90px); }
+        .card-title { font-size: clamp(14px, 3.8vw, 18px); }
+        .card-amount { font-size: clamp(16px, 4.2vw, 20px); }
+        .card-btn { height: clamp(42px, 11vw, 50px); font-size: clamp(12px, 3.2vw, 14px); }
+        .area-select { font-size: clamp(11px, 3vw, 14px); }
     </style>
+    <!-- Toss Pixel SDK (async/defer 금지, SDK가 head에 먼저 로드되어야 함) -->
+    <script src="https://static.toss.im/lex/v1.js"></script>
 </head>
 <body>
     <div id="app">
@@ -235,29 +277,39 @@
 
         <!-- 필터 및 헤더 -->
         <div class="header">
-            <h2>어떤 혜택과 여행을 찾으시나요?</h2>
+            <div style="display:flex;justify-content:space-between;align-items:center;width:100%;">
+                <h2 style="word-break:keep-all;margin:0;">어떤 혜택과 여행을 찾으시나요?</h2>
+                <div id="rewardDisplay" class="reward-display">❤️ 0</div>
+            </div>
             
             <!-- 지역별 (전국, 시/도, 군/구) 다단계 필터 -->
             <div class="area-filter-row">
-                <select id="sidoSelect" class="area-select" onchange="onSidoChange()">
+                <select id="sidoSelect" class="area-select">
                     <option value="0">전국 (시/도 선택)</option>
                 </select>
-                <select id="sigunguSelect" class="area-select" onchange="onSigunguChange()">
+                <select id="sigunguSelect" class="area-select">
                     <option value="0">시/군/구 선택</option>
                 </select>
             </div>
 
-            <div class="filter-container">
-                <button id="filter-all" class="filter-chip all-active" onclick="clickAll()">🎁 혜택 전체보기</button>
-                <button id="filter-benefit" class="filter-chip category" onclick="toggleFilter('benefit')">💸 정부지원금</button>
-                <button id="filter-payback" class="filter-chip category" onclick="toggleFilter('payback')">💵 지자체환급</button>
-                <button id="filter-free" class="filter-chip category" onclick="toggleFilter('free')">🎫 무료입장/이용</button>
-                <button id="filter-festival" class="filter-chip category" onclick="toggleFilter('festival')">🎉 축제/공연/행사</button>
-                <button id="filter-water" class="filter-chip category" onclick="toggleFilter('water')">🌊 물놀이/수영장</button>
-                <button id="filter-eco" class="filter-chip category" onclick="toggleFilter('eco')">🌿 생태관광</button>
-                <button id="filter-barrier" class="filter-chip category" onclick="toggleFilter('barrier')">♿ 무장애여행</button>
-                <button id="filter-pet" class="filter-chip category" onclick="toggleFilter('pet')">🐶 반려동물동반</button>
-                <button id="filter-camp" class="filter-chip category" onclick="toggleFilter('camp')">🏕️ 고캠핑/야영</button>
+            <div class="filter-container" id="filterContainer">
+                <button id="filter-all" class="filter-chip all-active" data-filter="all">🎁 혜택 전체보기</button>
+                <button id="filter-benefit" class="filter-chip category" data-filter="benefit">💸 정부지원금</button>
+                <button id="filter-payback" class="filter-chip category" data-filter="payback">💵 지자체환급</button>
+                <button id="filter-free" class="filter-chip category" data-filter="free">🎫 무료입장/이용</button>
+                <button id="filter-festival" class="filter-chip category" data-filter="festival">🎉 축제/공연/행사</button>
+                <button id="filter-water" class="filter-chip category" data-filter="water">🌊 물놀이/수영장</button>
+                <button id="filter-eco" class="filter-chip category" data-filter="eco">🌿 생태관광</button>
+                <button id="filter-barrier" class="filter-chip category" data-filter="barrier">♿ 무장애여행</button>
+                <button id="filter-pet" class="filter-chip category" data-filter="pet">🐶 반려동물동반</button>
+                <button id="filter-camp" class="filter-chip category" data-filter="camp">🏕️ 고캠핑/야영</button>
+            </div>
+            <div class="eligibility-container" id="eligibilityContainer" style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px;">
+                <span style="font-size:11px;color:var(--toss-grey-600);align-self:center;margin-right:2px;">내 자격:</span>
+                <button class="filter-chip eligibility-chip" id="eligibility-company_vacation" data-eligibility="company_vacation">🏢 기업휴가지원</button>
+                <button class="filter-chip eligibility-chip" id="eligibility-low_income" data-eligibility="low_income">🪪 저소득층</button>
+                <button class="filter-chip eligibility-chip" id="eligibility-multi_child" data-eligibility="multi_child">👨‍👩‍👧‍👦 다자녀</button>
+                <button class="filter-chip eligibility-chip" id="eligibility-disabled" data-eligibility="disabled">♿ 장애인</button>
             </div>
         </div>
 
@@ -269,11 +321,11 @@
         </div>
 
         <!-- 달력 영역 -->
-        <div class="calendar-container">
+        <div class="calendar-container" id="calendarContainer">
             <div class="month-display">
-                <span class="month-btn" onclick="changeMonth(-1)">&lt;</span>
+                <span class="month-btn" data-month="-1">&lt;</span>
                 <span id="currentMonthLabel">2026년 6월</span>
-                <span class="month-btn" onclick="changeMonth(1)">&gt;</span>
+                <span class="month-btn" data-month="1">&gt;</span>
             </div>
             <div id="calendarGrid" class="calendar-grid"></div>
         </div>
@@ -283,11 +335,11 @@
             <div style="width:40px; height:5px; background:#e5e5e5; border-radius:3px; margin: 0 auto 16px; shrink: 0;"></div>
             <div class="sheet-header">
                 <h3 id="sheetTitle" class="sheet-title">혜택 상세</h3>
-                <span onclick="closeSheet()" style="cursor:pointer; font-weight:600; color:var(--toss-grey-600)">닫기</span>
+                <span id="sheetCloseBtn" style="cursor:pointer; font-weight:600; color:var(--toss-grey-600)">닫기</span>
             </div>
             <div id="cardList" class="sheet-scroll-area"></div>
         </div>
-        <div id="overlay" class="overlay" onclick="closeSheet()"></div>
+        <div id="overlay" class="overlay"></div>
     </div>
 
     <!-- 로직 연결 및 외부 데이터 로딩 -->

@@ -1,5 +1,7 @@
 // 오늘 날짜 고정 (가이드 및 명세 준수)
 const FIXED_TODAY = new Date(2026, 5, 25); // 2026년 6월 25일
+const ADS_ENABLED = true; // 광고 모듈 ON/OFF (true로 변경 시 활성화)
+const REWARD_KEY = 'rewardPoints';
 let currentYear = FIXED_TODAY.getFullYear();
 let currentMonth = FIXED_TODAY.getMonth();
 
@@ -10,8 +12,10 @@ let petData = [];      // 반려동물 동반 시설 (필터 시 전국 상시 �
 let activeFilters = [];
 
 let usedBenefits = [];
+let userEligibility = [];
 if (typeof localStorage !== 'undefined') {
     usedBenefits = JSON.parse(localStorage.getItem('usedBenefits') || '[]');
+    userEligibility = JSON.parse(localStorage.getItem('userEligibility') || '[]');
 }
 let currentOpenedSheetDate = null;
 let currentOpenedSheetItems = null;
@@ -27,9 +31,26 @@ function toggleBenefitUsed(name) {
         localStorage.setItem('usedBenefits', JSON.stringify(usedBenefits));
     }
     updateDashboard();
-    if (currentOpenedSheetDate && currentOpenedSheetItems) {
-        openSheet(currentOpenedSheetDate, currentOpenedSheetItems);
-    }
+    // 시트를 닫지 않고 체크박스+스타일만 실시간 업데이트
+    document.querySelectorAll('.linked-benefit-row').forEach(row => {
+        const cb = row.querySelector('input[type="checkbox"]');
+        const nameEl = row.querySelector('.linked-benefit-name');
+        if (!cb || !nameEl) return;
+        const benefitName = nameEl.textContent.replace('💸', '').trim();
+        const isUsed = usedBenefits.includes(benefitName);
+        cb.checked = isUsed;
+        row.style.opacity = isUsed ? '0.6' : '';
+        row.style.background = isUsed ? 'var(--toss-grey-100)' : '';
+        nameEl.style.textDecoration = isUsed ? 'line-through' : '';
+        nameEl.style.color = isUsed ? '#6B7684' : '';
+        const btn = row.querySelector('.linked-benefit-btn');
+        if (btn) {
+            btn.disabled = isUsed;
+            btn.style.background = isUsed ? '#E5E8EB' : '#0064FF';
+            btn.style.color = isUsed ? '#8B95A1' : 'white';
+            btn.style.cursor = isUsed ? 'not-allowed' : 'pointer';
+        }
+    });
 }
 
 
@@ -42,6 +63,7 @@ function preprocessDataByAddress() {
     });
 
     const processItem = (item) => {
+        if (item.areaCd && item.areaCd !== 0) return;
         if (!item.mapUrl) return;
         try {
             const urlObj = new URL(item.mapUrl);
@@ -109,7 +131,7 @@ async function loadBenefitsData() {
     render();
     updateDashboard();
 
-    // 2단계: 대용량 공공데이터가 내장된 data.js 파일을 백그라운드 비동기로 로드합니다.
+    // 2단계: 대용량 공공데이터(data.js)를 백그라운드 비동기로 로드합니다.
     const script = document.createElement('script');
     script.src = 'data.js';
     script.async = true;
@@ -348,6 +370,7 @@ function updateDashboard() {
                 // 1단계: benefits 배열이 있으면 각 상세 혜택별로 유니크하게 파싱하여 합산
                 if (item.benefits && item.benefits.length > 0) {
                     item.benefits.forEach(b => {
+                        if (b.eligible && !userEligibility.includes(b.eligible)) return;
                         const targetText = (b.name + " " + b.desc).replace(/,/g, '');
                         let parsedVal = 0;
 
@@ -612,6 +635,9 @@ function onSidoChange() {
     
     render();
     updateDashboard();
+    if (currentOpenedSheetDate) {
+        openSheet(currentOpenedSheetDate, currentOpenedSheetItems);
+    }
 }
 
 function onSigunguChange() {
@@ -621,6 +647,9 @@ function onSigunguChange() {
     }
     render();
     updateDashboard();
+    if (currentOpenedSheetDate) {
+        openSheet(currentOpenedSheetDate, currentOpenedSheetItems);
+    }
 }
 
 function render() {
@@ -763,6 +792,9 @@ function toggleFilter(type) {
     }
     render();
     updateDashboard();
+    if (currentOpenedSheetDate) {
+        openSheet(currentOpenedSheetDate, currentOpenedSheetItems);
+    }
 }
 
 function clickAll() {
@@ -771,6 +803,62 @@ function clickAll() {
     document.getElementById('filter-all').classList.add('all-active');
     render();
     updateDashboard();
+    if (currentOpenedSheetDate) {
+        openSheet(currentOpenedSheetDate, currentOpenedSheetItems);
+    }
+}
+
+const ELIGIBILITY_OPTIONS = [
+    { key: 'company_vacation', label: '기업휴가지원 등록', emoji: '🏢' },
+    { key: 'low_income', label: '저소득층', emoji: '🪪' },
+    { key: 'multi_child', label: '다자녀', emoji: '👨‍👩‍👧‍👦' },
+    { key: 'disabled', label: '장애인', emoji: '♿' }
+];
+
+function toggleEligibility(type) {
+    const idx = userEligibility.indexOf(type);
+    if (idx > -1) {
+        userEligibility.splice(idx, 1);
+    } else {
+        userEligibility.push(type);
+    }
+    if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('userEligibility', JSON.stringify(userEligibility));
+    }
+    render();
+    updateDashboard();
+    updateEligibilityChips();
+    if (currentOpenedSheetDate) {
+        openSheet(currentOpenedSheetDate, currentOpenedSheetItems);
+    }
+}
+
+function updateEligibilityChips() {
+    ELIGIBILITY_OPTIONS.forEach(function(opt) {
+        const el = document.getElementById('eligibility-' + opt.key);
+        if (el) {
+            if (userEligibility.includes(opt.key)) {
+                el.classList.add('active');
+            } else {
+                el.classList.remove('active');
+            }
+        }
+    });
+}
+
+function getRewardPoints() {
+    return parseInt(localStorage.getItem(REWARD_KEY), 10) || 0;
+}
+
+function addRewardPoints(amount) {
+    const total = getRewardPoints() + amount;
+    localStorage.setItem(REWARD_KEY, total.toString());
+    updateRewardDisplay();
+}
+
+function updateRewardDisplay() {
+    const el = document.getElementById('rewardDisplay');
+    if (el) el.textContent = '❤️ ' + getRewardPoints();
 }
 
 function changeMonth(step) {
@@ -786,12 +874,26 @@ function openSheet(dateStr, items) {
     const [y, m, d] = dateStr.split('-');
     const list = document.getElementById('cardList');
 
-    // 이미 render()에서 필터링되어 넘어온 로컬 행사 목록
-    let displayItems = [...items];
+    const dayData = benefitsData[dateStr] || [];
+    
+    // 1차 카테고리 필터링
+    let displayItems = activeFilters.length === 0 
+        ? dayData 
+        : dayData.filter(item => activeFilters.some(f => (item.tags || []).includes(f)));
 
-    // 팝업 리스트에서 전국 공통 혜택(areaCd === 0) 카드 단독 노출 제거 
-    // (오직 실제 행사/축제 카드만 리스트에 나오고, 공통 혜택은 상세보기 안에만 조인되어 제공됨)
-    displayItems = displayItems.filter(item => item.areaCd !== 0);
+    // 2차 지역 필터링
+    if (selectedSido !== "0") {
+        displayItems = displayItems.filter(item => {
+            if (item.areaCd === 0) return true;
+            return String(item.areaCd) === selectedSido;
+        });
+    }
+    if (selectedSigungu !== "0") {
+        displayItems = displayItems.filter(item => {
+            if (item.areaCd === 0) return true;
+            return String(item.sigunguCd) === selectedSigungu;
+        });
+    }
 
     // 중복 제거 (제목 기준)
     const seenTitles = new Set();
@@ -811,22 +913,6 @@ function openSheet(dateStr, items) {
         "wheelchair": "휠체어이용", "water": "물놀이/수영장"
     };
     
-    // 토스 애즈 연동 테스트용 프리미엄 골드 네이티브 제휴 혜택 카드 객체 정의
-    const adCardHtml = `
-        <div class="benefit-card gold-card">
-            <span class="ad-badge">AD 제휴혜택</span>
-            <div class="card-tags">
-                <span class="tag-badge" style="border-color:#e5e5e5; color:#6b7684">#전국 공통</span>
-                <span class="tag-badge tag-ad">#TossAds제휴</span>
-            </div>
-            <div class="card-title">[Toss Ads] 전국 여행 지원 웰컴 제휴 할인 쿠폰</div>
-            <div class="card-amount ad-amount">렌터카 & 숙박 최대 20% 즉시 할인</div>
-            <button class="card-btn gold-btn" onclick="openExternal('https://developers-apps-in-toss.toss.im')">
-                제휴쿠폰 받기
-            </button>
-        </div>
-    `;
-
     const cardListArray = displayItems.map((item, idx) => {
         const isLocal = item.areaCd !== 0;
         const isWater = /물놀이|수영장|분수|풀장/.test(item.title);
@@ -847,32 +933,38 @@ function openSheet(dateStr, items) {
         const regionLabel = (item.areaNm || '전국') + (item.sigunguNm ? ' ' + item.sigunguNm : '');
 
         // === 상세 영역 HTML (숨김 상태로 시작) ===
-        // 혜택 신청 링크: benefits 배열 첫 번째 공식 URL 사용 (네이버 검색 대신 실제 사이트로)
-        const firstBenefitLink = (item.benefits && item.benefits.length > 0) ? item.benefits[0].link : '';
-        const mainLink = firstBenefitLink || item.benefitLink || '';
-        const mapBtnHtml = item.mapUrl
-            ? `<button class="card-btn" style="flex:1;background:var(--toss-grey-100);color:var(--toss-grey-800);border:1px solid var(--toss-grey-600);width:auto;" onclick="openExternal('${item.mapUrl}')">📍 지도보기</button>`
-            : '';
+        const mainLink = item.source || item.benefitLink || '';
+        let mapEmbedHtml = '';
+        if (item.mapUrl) {
+            try {
+                const query = new URL(item.mapUrl).searchParams.get('query');
+                if (query) {
+                    const embedUrl = 'https://maps.google.com/maps?q=' + encodeURIComponent(decodeURIComponent(query)) + '&output=embed&hl=ko';
+                    mapEmbedHtml = '<div style="margin:10px 0 4px;border-radius:10px;overflow:hidden;"><iframe width="100%" height="180" frameborder="0" style="border:0;display:block;" src="' + embedUrl + '" allowfullscreen loading="lazy"></iframe></div>';
+                }
+            } catch (e) {}
+        }
 
         let benefitsRowsHtml = '';
         if (item.benefits && item.benefits.length > 0 && isLocal) {
             benefitsRowsHtml = `
                 <div class="benefits-section">
                     <div class="benefits-section-title">🎟️ 이 행사에서 쓸 수 있는 혜택</div>
-                    ${item.benefits.map(b => {
+                    ${item.benefits.map(function(b) {
                         const isUsed = usedBenefits.includes(b.name);
-                        return `
-                        <div class="linked-benefit-row" style="${isUsed ? 'opacity:0.6;background:var(--toss-grey-100);' : ''}">
-                            <input type="checkbox" ${isUsed ? 'checked' : ''} 
-                                onclick="event.stopPropagation(); toggleBenefitUsed('${b.name}')" 
-                                style="width:16px;height:16px;cursor:pointer;accent-color:var(--toss-blue);flex-shrink:0;margin-right:8px;" />
-                            <div class="linked-benefit-info" style="flex:1;">
-                                <div class="linked-benefit-name" style="${isUsed ? 'text-decoration:line-through;color:var(--toss-grey-600);' : ''}">💸 ${b.name}</div>
-                                <div class="linked-benefit-desc">${b.desc}</div>
-                            </div>
-                            <button class="linked-benefit-btn" onclick="openExternal('${b.link}')" ${isUsed ? 'disabled style="background:var(--toss-grey-300);color:var(--toss-grey-500);cursor:not-allowed;"' : ''}>신청</button>
-                        </div>
-                        `;
+                        const canUse = !b.eligible || userEligibility.includes(b.eligible);
+                        const rowStyle = isUsed ? 'opacity:0.6;background:var(--toss-grey-100);' : (!canUse ? 'opacity:0.45;' : '');
+                        const nameStyle = isUsed ? 'text-decoration:line-through;color:var(--toss-grey-600);' : (!canUse ? 'color:var(--toss-grey-500);' : '');
+                        const lockBadge = !canUse && !isUsed ? '<span style="font-size:9px;color:var(--toss-grey-500);margin-left:4px;">🔒 자격선택 필요</span>' : '';
+                        return '<div class="linked-benefit-row"' + (rowStyle ? ' style="' + rowStyle + '"' : '') + '>' +
+                            '<input type="checkbox" class="benefit-checkbox" data-benefit-name="' + b.name.replace(/"/g,'&quot;') + '"' + (isUsed ? ' checked' : '') +
+                            ' style="width:16px;height:16px;cursor:pointer;accent-color:var(--toss-blue);flex-shrink:0;margin-right:8px;"' + (!canUse && !isUsed ? ' disabled' : '') + ' />' +
+                            '<div class="linked-benefit-info" style="flex:1;">' +
+                            '<div class="linked-benefit-name"' + (nameStyle ? ' style="' + nameStyle + '"' : '') + '>💸 ' + b.name + lockBadge + '</div>' +
+                            '<div class="linked-benefit-desc">' + b.desc + '</div>' +
+                            '</div>' +
+                            '<button class="linked-benefit-btn open-url-btn" data-url="' + b.link.replace(/"/g,'&quot;') + '"' + ((isUsed || !canUse) ? ' disabled style="background:var(--toss-grey-300);color:var(--toss-grey-500);cursor:not-allowed;"' : '') + '>신청</button>' +
+                            '</div>';
                     }).join('')}
                 </div>
             `;
@@ -881,34 +973,31 @@ function openSheet(dateStr, items) {
         // 행사 신청 버튼 딱 1개만 정의 (중복 다중 버튼 제거)
         let applyBtnsHtml = '';
         if (mainLink) {
-            applyBtnsHtml = `<button class="card-btn" style="flex:1.8;width:auto;" onclick="openExternal('${mainLink}')">행사 신청</button>`;
+            applyBtnsHtml = `<button class="card-btn open-url-btn" data-url="${mainLink.replace(/"/g,'&quot;')}" style="width:80%;max-width:360px;">행사 신청</button>`;
         }
 
         const detailHtml = `
             <div id="detail-${idx}" class="card-detail" style="display:none;margin-top:10px;">
                 ${item.period && item.period !== '상시 운영' ? `<div class="card-period">📅 ${item.period}</div>` : ''}
+                ${mapEmbedHtml}
                 ${benefitsRowsHtml}
-                ${applyBtnsHtml || mainLink ? `
-                <div style="display:flex;flex-wrap:wrap;gap:6px;width:100%;margin-top:10px;">
-                    ${applyBtnsHtml}
-                    ${mapBtnHtml}
-                </div>` : mapBtnHtml ? `<div style="display:flex;gap:8px;width:100%;margin-top:10px;">${mapBtnHtml}</div>` : ''}
+                ${applyBtnsHtml ? `<div style="display:flex;justify-content:center;width:100%;margin-top:10px;">${applyBtnsHtml}</div>` : ''}
             </div>
         `;
 
         // === 간략 카드 (기본 표시) ===
         return `
             <div class="benefit-card ${borderClass}">
-                <div style="display:flex;align-items:flex-start;gap:10px;">
+                <div style="display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap;">
                     <div style="font-size:22px;flex-shrink:0;line-height:1.2;">${typeEmoji}</div>
                     <div style="flex:1;min-width:0;">
                         <div style="font-size:10px;color:var(--toss-grey-600);margin-bottom:3px;">#${regionLabel}
-                            ${tags.slice(0,2).map(t => `<span style="margin-left:4px;">#${tagTranslation[t]||t}</span>`).join('')}
+                            ${tags.map(t => `<span style="margin-left:4px;">#${tagTranslation[t]||t}</span>`).join('')}
                         </div>
-                        <div class="card-title" style="padding-right:0;">${item.title}</div>
+                        <div class="card-title" style="padding-right:0;word-break:break-word;">${item.title}</div>
                         <div class="card-amount" style="font-size:12px;margin-bottom:0;">${item.amount || ''}</div>
                     </div>
-                    <button onclick="toggleDetail(${idx})" id="toggle-btn-${idx}"
+                    <button class="detail-toggle-btn" data-idx="${idx}"
                         style="flex-shrink:0;height:30px;padding:0 10px;background:var(--toss-grey-100);border:1px solid var(--toss-grey-600);border-radius:8px;font-size:11px;font-weight:700;color:var(--toss-grey-800);cursor:pointer;white-space:nowrap;">
                         상세보기
                     </button>
@@ -918,30 +1007,82 @@ function openSheet(dateStr, items) {
         `;
     });
 
-    // 카드 목록 중간 임의의 위치(랜덤 인덱스)에 광고 카드를 유려하게 주입
-    if (cardListArray.length > 0) {
-        const insertIndex = Math.floor(Math.random() * (cardListArray.length + 1));
-        cardListArray.splice(insertIndex, 0, adCardHtml);
-    } else {
-        cardListArray.push(adCardHtml);
-    }
-    
+    // 카드 목록 랜덤 위치에 Toss Ads 피드형 배너 삽입
+    const adContainerId = 'tossAdBanner-' + Date.now();
+    const adPlaceholder = `<div id="${adContainerId}" style="width:100%;min-height:100px;margin-bottom:12px;"></div>`;
+    const insertIdx = cardListArray.length > 0 ? Math.floor(Math.random() * (cardListArray.length + 1)) : 0;
+    cardListArray.splice(insertIdx, 0, adPlaceholder);
+
     list.innerHTML = cardListArray.join('');
-    
+
+    if (ADS_ENABLED) attachTossBanner(adContainerId);
+
     document.getElementById('bottomSheet').classList.add('open');
     document.getElementById('overlay').classList.add('visible');
 }
 
 function toggleDetail(idx) {
     const detail = document.getElementById(`detail-${idx}`);
-    const btn = document.getElementById(`toggle-btn-${idx}`);
-    if (!detail) return;
+    const btn = document.querySelector(`.detail-toggle-btn[data-idx="${idx}"]`);
+    if (!detail || !btn) return;
     const isOpen = detail.style.display !== 'none';
     detail.style.display = isOpen ? 'none' : 'block';
     btn.textContent = isOpen ? '상세보기' : '닫기';
 }
 
+// 이벤트 위임: 월 변경 버튼 처리
+document.getElementById('calendarContainer').addEventListener('click', function(e) {
+    const btn = e.target.closest('[data-month]');
+    if (!btn) return;
+    changeMonth(parseInt(btn.dataset.month));
+});
+
+// 이벤트 위임: filterContainer 내 필터 버튼 처리
+document.getElementById('filterContainer').addEventListener('click', function(e) {
+    const btn = e.target.closest('[data-filter]');
+    if (!btn) return;
+    const filterType = btn.dataset.filter;
+    if (filterType === 'all') {
+        clickAll();
+    } else {
+        toggleFilter(filterType);
+    }
+});
+
+// 이벤트 위임: eligibilityContainer 내 자격 칩 처리
+document.getElementById('eligibilityContainer').addEventListener('click', function(e) {
+    const btn = e.target.closest('[data-eligibility]');
+    if (!btn) return;
+    toggleEligibility(btn.dataset.eligibility);
+});
+
+// 이벤트 위임: cardList 내 모든 버튼 처리 (WebView에서 인라인 onclick 미지원 대응)
+document.getElementById('cardList').addEventListener('click', function(e) {
+    const target = e.target;
+    if (target.closest('.benefit-checkbox')) {
+        e.stopPropagation();
+        return;
+    }
+    const toggleBtn = target.closest('.detail-toggle-btn');
+    if (toggleBtn) { toggleDetail(parseInt(toggleBtn.dataset.idx)); return; }
+    const urlBtn = target.closest('.open-url-btn');
+    if (urlBtn && !urlBtn.disabled) { openExternal(urlBtn.dataset.url); return; }
+});
+document.getElementById('cardList').addEventListener('change', function(e) {
+    const cb = e.target.closest('.benefit-checkbox');
+    if (cb) { toggleBenefitUsed(cb.dataset.benefitName); }
+});
+
+document.getElementById('sheetCloseBtn').addEventListener('click', closeSheet);
+document.getElementById('overlay').addEventListener('click', closeSheet);
+document.getElementById('sidoSelect').addEventListener('change', onSidoChange);
+document.getElementById('sigunguSelect').addEventListener('change', onSigunguChange);
+
 function closeSheet() {
+    if (activeTossAdBanner) {
+        activeTossAdBanner.destroy();
+        activeTossAdBanner = null;
+    }
     document.getElementById('bottomSheet').classList.remove('open');
     document.getElementById('overlay').classList.remove('visible');
     currentOpenedSheetDate = null;
@@ -949,6 +1090,14 @@ function closeSheet() {
 }
 
 function openExternal(url) {
+    if (url.includes('google.com/maps')) {
+        openMapUrl(url);
+        return;
+    }
+    openExternalDirect(url);
+}
+
+function openExternalDirect(url) {
     if (window.Toss && window.Toss.openExternal) {
         Toss.openExternal({ url: url });
     } else {
@@ -956,28 +1105,165 @@ function openExternal(url) {
     }
 }
 
+function openMapUrl(googleUrl) {
+    let query;
+    try { query = new URL(googleUrl).searchParams.get('query'); } catch (e) {}
+    if (!query) { openExternalDirect(googleUrl); return; }
+    const place = encodeURIComponent(decodeURIComponent(query));
+
+    let opened = false;
+    const onVis = () => { if (document.hidden) { opened = true; document.removeEventListener('visibilitychange', onVis); } };
+    document.addEventListener('visibilitychange', onVis);
+
+    // 1. Kakao Map
+    openExternalDirect(`kakaomap://search?q=${place}`);
+    setTimeout(() => {
+        if (opened) { document.removeEventListener('visibilitychange', onVis); return; }
+        // 2. Naver Map
+        openExternalDirect(`nmap://search?query=${place}`);
+        setTimeout(() => {
+            document.removeEventListener('visibilitychange', onVis);
+            if (opened) return;
+            // 3. Google Maps web fallback
+            openExternalDirect(googleUrl);
+        }, 1000);
+    }, 1000);
+}
+
 // TossAds 배너 인스턴스를 관리하기 위한 변수
 let activeTossAdBanner = null;
 
-// 시작점 설정
-window.onload = async () => {
-    initAreaFilters();
-    loadBenefitsData();
+function attachTossBanner(containerId) {
+    if (activeTossAdBanner) {
+        activeTossAdBanner.destroy();
+        activeTossAdBanner = null;
+    }
+    const container = document.getElementById(containerId || 'tossAdBanner');
+    if (!container) return;
+    if (typeof TossAds === 'undefined' || !TossAds.attachBanner || !TossAds.attachBanner.isSupported()) return;
+    try {
+        activeTossAdBanner = TossAds.attachBanner(
+            'ait.v2.live.c5633be2471a4b9c',
+            container,
+            {
+                theme: 'auto',
+                tone: 'blackAndWhite',
+                variant: 'expanded',
+                callbacks: {
+                    onAdRendered: (p) => console.log('TossAd rendered:', p.slotId),
+                    onAdFailedToRender: (p) => console.warn('TossAd failed:', p.error?.message),
+                    onNoFill: (p) => console.warn('TossAd no fill')
+                }
+            }
+        );
+    } catch (e) {
+        console.warn('TossAds attachBanner error:', e);
+    }
+}
 
-    // 토스 애즈(Toss Ads) SDK 초기화
-    if (window.TossAds && typeof window.TossAds.isSupported === 'function' && window.TossAds.isSupported()) {
-        try {
-            console.log("TossAds SDK 초기화를 진행합니다.");
-            await window.TossAds.initialize();
-        } catch (adError) {
-            console.error("TossAds 연동 중 오류가 발생했습니다:", adError);
+// 리워드 광고(Rewarded) 상태 관리
+let rewardedAdLoaded = false;
+const REWARDED_AD_ID = 'ait.v2.live.be0a965d07e0432b'; // TODO: 실제 adGroupId로 교체
+
+function preloadRewardedAd() {
+    if (typeof loadRewardedAd === 'undefined' || !loadRewardedAd.isSupported()) {
+        return;
+    }
+    loadRewardedAd({
+        options: { adGroupId: REWARDED_AD_ID },
+        onEvent: (event) => {
+            if (event.type === 'loaded') {
+                rewardedAdLoaded = true;
+                if (typeof TossPixel !== 'undefined') {
+                    try { TossPixel('7874162214141259463').adImpression(); } catch (e) {}
+                }
+            }
+        },
+        onError: () => {}
+    });
+}
+
+function tryShowRewardedAd() {
+    if (!rewardedAdLoaded || typeof showRewardedAd === 'undefined' || !showRewardedAd.isSupported()) {
+        return false;
+    }
+    showRewardedAd({
+        options: { adGroupId: REWARDED_AD_ID },
+        onEvent: (event) => {
+            switch (event.type) {
+                case 'reward':
+                    localStorage.setItem('rewardedOnExit', 'done');
+                    addRewardPoints(1);
+                    break;
+                case 'dismissed':
+                case 'failedToShow':
+                    rewardedAdLoaded = false;
+                    preloadRewardedAd();
+                    break;
+            }
+        },
+        onError: () => {
+            rewardedAdLoaded = false;
+        }
+    });
+    localStorage.setItem('rewardedOnExit', 'pending');
+    return true;
+}
+
+// 강제종료 리워드 재개 처리
+function checkPendingReward() {
+    const status = localStorage.getItem('rewardedOnExit');
+    if (status === 'pending') {
+        if (confirm('이전에 광고 시청이 완료되지 않았습니다. 지면 광고를 시청하시겠습니까?')) {
+            localStorage.removeItem('rewardedOnExit');
+            preloadRewardedAd();
+            tryShowRewardedAd();
+        } else {
+            localStorage.removeItem('rewardedOnExit');
+        }
+    } else if (status === 'done') {
+        localStorage.removeItem('rewardedOnExit');
+    }
+}
+
+window.onload = () => {
+    if (ADS_ENABLED) {
+        if (typeof TossPixel !== 'undefined') {
+            try { TossPixel('7874162214141259463').pageView(); } catch (e) { console.warn('TossPixel.pageView error:', e); }
+        }
+
+        checkPendingReward();
+
+        if (typeof TossAds !== 'undefined' && TossAds.initialize && TossAds.initialize.isSupported()) {
+            TossAds.initialize({
+                callbacks: {
+                    onInitialized: () => {
+                        preloadRewardedAd();
+                    },
+                    onInitializationFailed: () => {}
+                }
+            });
+        } else {
+            preloadRewardedAd();
         }
     }
+
+    initAreaFilters();
+    loadBenefitsData();
+    updateEligibilityChips();
+    updateRewardDisplay();
 };
 
-// 미니앱 제거/언마운트 시 메모리 정리를 위한 소멸 처리 적용
 window.onbeforeunload = () => {
-    if (window.TossAds && typeof window.TossAds.destroyAll === 'function') {
-        window.TossAds.destroyAll();
+    if (ADS_ENABLED) {
+        tryShowRewardedAd();
+
+        if (activeTossAdBanner) {
+            activeTossAdBanner.destroy();
+            activeTossAdBanner = null;
+        }
+        if (typeof TossAds !== 'undefined' && TossAds.destroyAll && TossAds.destroyAll.isSupported()) {
+            TossAds.destroyAll();
+        }
     }
 };
