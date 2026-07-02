@@ -4,14 +4,14 @@ export default {
   brand: {
     displayName: "정부혜택달력",
     primaryColor: "#FF8A65",
-    icon: "appsintoss-logo.png",
+    icon: "app_logo_main_1782592690933.png",
   },
   web: {
     host: "localhost",
     port: 5173,
     commands: {
       dev: "echo dev",
-      build: "node -e \"const fs = require('fs'); if (!fs.existsSync('dist')) fs.mkdirSync('dist'); ['index.html', 'app.js', 'style.css', 'data.json', 'data.js', 'appsintoss-logo.png'].forEach(f => { if (fs.existsSync(f)) fs.copyFileSync(f, 'dist/' + f); })\""
+      build: "node -e \"const fs = require('fs'); if (!fs.existsSync('dist')) fs.mkdirSync('dist'); ['index.html', 'app.js', 'style.css', 'data.json', 'data.js', 'app_logo_main_1782592690933.png'].forEach(f => { if (fs.existsSync(f)) fs.copyFileSync(f, 'dist/' + f); })\""
     },
   },
   permissions: [],
