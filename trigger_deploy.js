@@ -41,7 +41,7 @@ async function run() {
     const config = {
       artifactPath: path.resolve('test-app/govbenefit-hunter.ait'),
       appName: 'govbenefit-hunter',
-      deploymentId: '019f295c-6ccd-7e13-9d36-f90dc4d78dab',
+      deploymentId: '019f2962-28ae-7bd6-9515-ac8c39b258af',
       apiKey: '5xZHDDQGkiFkDUG8_VR4DpiIiSEmsGKK8vlKIqPUH4U',
       memo: '정부혜택달력 브랜드 아이콘 정합성 수정 완료 버전',
       baseUrl: 'https://apps-in-toss.toss.im/console',
