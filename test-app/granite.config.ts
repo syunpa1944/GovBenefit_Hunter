@@ -5,7 +5,7 @@ export default defineConfig({
   brand: {
     displayName: "정부혜택달력",
     primaryColor: "#0064FF",
-    icon: "app_logo_main_1782592690933.png",
+    icon: "appsintoss-logo.png",
   },
   web: {
     host: "localhost",
