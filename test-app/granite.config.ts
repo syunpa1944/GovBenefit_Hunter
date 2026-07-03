@@ -6,7 +6,6 @@ export default defineConfig({
     displayName: "정부혜택달력",
     primaryColor: "#0064FF",
     icon: "icon.png",
-    iconDark: "icon.png",
   },
   web: {
     host: "localhost",
