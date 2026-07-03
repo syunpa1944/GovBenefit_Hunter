@@ -59,7 +59,8 @@ async function main() {
     'app.js',
     'style.css',
     'data.js',
-    'app_logo_main_1782592690933.png'
+    'app_logo_main_1782592690933.png',
+    'icon.png'
   ];
 
   // Write all original entries first (using normalized standard slash names)

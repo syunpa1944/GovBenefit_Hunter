@@ -1,7 +1,7 @@
 {
   "name": "test-app",
   "private": true,
-  "version": "20260704-27",
+  "version": "20260704-28",
   "type": "module",
   "scripts": {
     "dev": "granite dev",
