@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>정부 혜택 스마트 큐레이터</title>
+    <style>
+        :root {
+            --toss-blue: #0064FF;
+            --toss-blue-light: #E8F2FF;
+            --toss-grey-50: #FAFAFB;
+            --toss-grey-100: #F2F4F6;
+            --toss-grey-600: #6B7684;
+            --toss-grey-800: #333D4B;
+            --toss-white: #FFFFFF;
+            
+            --benefit-gold: #FFF9E6;
+            --benefit-gold-border: #FFD43B;
+            --benefit-gold-text: #856404;
+
+            --congestion-green: #34C759;
+            --congestion-yellow: #FF9500;
+            --congestion-red: #FF3B30;
+        }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body {
+            margin: 0; padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Pretendard", sans-serif;
+            background-color: var(--toss-grey-50); color: var(--toss-grey-800); user-select: none;
+        }
+        #app { max-width: 500px; margin: 0 auto; min-height: 100vh; background: var(--toss-white); display: flex; flex-direction: column; box-shadow: 0 0 20px rgba(0,0,0,0.05); }
+        
+        /* 혜택 요약 대시보드 */
+        .dashboard {
+            background: linear-gradient(135deg, #0064FF 0%, #004ecc 100%);
+            color: var(--toss-white);
+            padding: 24px 20px 20px;
+            border-radius: 0 0 24px 24px;
+        }
+        .dashboard-subtitle { font-size: 13px; opacity: 0.85; margin-bottom: 4px; font-weight: 600; }
+        .dashboard-title { font-size: 24px; font-weight: 800; margin-bottom: 8px; }
+        .dashboard-helper { 
+            font-size: 11px; 
+            opacity: 0.8; 
+            margin-bottom: 12px; 
+            line-height: 1.4; 
+            background: rgba(0, 0, 0, 0.15); 
+            padding: 8px 12px; 
+            border-radius: 8px; 
+            font-weight: 500; 
+        }
+        .dashboard-badge-container { display: flex; gap: 8px; flex-wrap: wrap; }
+        .dashboard-badge { background: rgba(255, 255, 255, 0.2); font-size: 11px; padding: 4px 8px; border-radius: 12px; font-weight: 600; }
+
+        /* 헤더 */
+        .header { padding: 20px 16px 8px; background: var(--toss-white); position: sticky; top: 0; z-index: 10; }
+        .header h2 { font-size: 18px; font-weight: 700; margin: 0 0 12px; }
+        
+        .filter-container { 
+            display: grid; 
+            grid-template-columns: repeat(3, 1fr); 
+            gap: 8px; 
+            padding-bottom: 4px; 
+        }
+        
+        .filter-chip {
+            justify-content: center;
+            white-space: nowrap; padding: 10px 4px; border-radius: 12px;
+            background: var(--toss-grey-100); font-size: 13px; font-weight: 600;
+            color: var(--toss-grey-600); cursor: pointer; border: 1.2px solid transparent;
+            transition: all 0.2s; display: flex; align-items: center; gap: 4px;
+        }
+        .filter-chip.active { background: var(--toss-blue-light); color: var(--toss-blue); border-color: var(--toss-blue); }
+        .filter-chip.all-active { background: var(--toss-blue); color: var(--toss-white); }
+        
+        /* 1번째 칩(전체보기)이 첫 줄을 크게 차지하거나 전체적으로 균등하게 3열 정렬되도록 구성 */
+        #filter-all {
+            grid-column: span 3;
+            padding: 12px 14px;
+        }
+        
+        /* 범례 설명 */
+        .legend-container { display: flex; justify-content: flex-end; gap: 12px; padding: 12px 16px 0; font-size: 11px; color: var(--toss-grey-600); font-weight: 500; }
+        .legend-item { display: flex; align-items: center; gap: 4px; }
+        .legend-dot { width: 6px; height: 6px; border-radius: 50%; }
+
+        /* 캘린더 */
+        .calendar-container { padding: 8px 16px 20px; background: var(--toss-white); }
+        .month-display { font-size: 17px; font-weight: 700; text-align: center; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
+        .month-btn { cursor: pointer; padding: 8px 16px; font-size: 18px; color: var(--toss-grey-600); }
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; background: var(--toss-grey-100); border: 1px solid var(--toss-grey-100); border-radius: 12px; overflow: hidden; }
+        .day-cell {
+            min-height: 80px; aspect-ratio: 1/1.2; background: var(--toss-white);
+            display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 8px 4px 6px;
+            cursor: pointer; position: relative; font-size: 13px; font-weight: 600;
+        }
+        .day-cell.other-month { background: var(--toss-grey-50); cursor: default; }
+        .day-cell.today { background: var(--toss-blue-light); }
+        
+        .congestion-bar {
+            width: 100%; height: 3px; border-radius: 1.5px;
+        }
+        .cell-amount {
+            font-size: 9px; font-weight: 700; color: var(--toss-blue); margin-top: 2px;
+            text-align: center; white-space: nowrap;
+        }
+
+        /* 바텀 시트 */
+        .bottom-sheet {
+            position: fixed; bottom: 0; left: 50%; transform: translate(-50%, 100%);
+            width: 100%; max-width: 500px; height: 80%;
+            background: var(--toss-white); border-radius: 24px 24px 0 0;
+            z-index: 1000; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            padding: 24px 16px; box-shadow: 0 -10px 30px rgba(0,0,0,0.15); display: flex; flex-direction: column;
+        }
+        .bottom-sheet.open { transform: translate(-50%, 0); }
+        .sheet-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .sheet-title { font-size: 18px; font-weight: 700; margin: 0; }
+        .sheet-scroll-area { overflow-y: auto; flex: 1; padding-bottom: 24px; }
+        
+        .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); display: none; z-index: 999; }
+        .overlay.visible { display: block; }
+        
+        /* 카드 디자인 */
+        .benefit-card { background: var(--toss-grey-100); border-radius: 18px; padding: 18px; margin-bottom: 12px; position: relative; border: 1px solid transparent; }
+        .benefit-card.gold-card { background: var(--benefit-gold); border: 1.2px solid var(--benefit-gold-border); }
+        
+        .ad-badge { 
+            position: absolute; top: 18px; right: 18px; font-size: 9px; font-weight: 800; 
+            color: var(--benefit-gold-text); background: var(--toss-white); padding: 2px 6px; border-radius: 4px; border: 1px solid var(--benefit-gold-border);
+        }
+        
+        .card-tags { display: flex; gap: 4px; margin-bottom: 8px; flex-wrap: wrap; }
+        .tag-badge { font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 4px; background: var(--toss-white); border: 1px solid var(--toss-blue); color: var(--toss-blue); }
+        .tag-badge.tag-ad { border-color: var(--benefit-gold-border); color: var(--benefit-gold-text); }
+        
+        .card-title { font-size: 16px; font-weight: 700; margin-bottom: 4px; padding-right: 40px; line-height: 1.3; }
+        .card-amount { font-size: 18px; font-weight: 800; color: var(--toss-blue); margin-bottom: 10px; }
+        .card-amount.ad-amount { color: var(--benefit-gold-text); }
+        .card-desc { font-size: 13px; color: var(--toss-grey-600); line-height: 1.45; margin-bottom: 14px; }
+        
+        .card-btn { width: 100%; height: 48px; background: var(--toss-blue); color: var(--toss-white); border: none; border-radius: 12px; font-weight: 600; cursor: pointer; transition: opacity 0.2s; }
+        .card-btn:active { opacity: 0.8; }
+        .card-btn.gold-btn { background: var(--benefit-gold-border); color: var(--benefit-gold-text); }
+        /* 지역 필터 셀렉트 박스 */
+        .area-filter-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+            padding: 0;
+        }
+        .area-select {
+            flex: 1;
+            height: 40px;
+            border-radius: 10px;
+            border: 1px solid var(--toss-grey-100);
+            background-color: var(--toss-grey-50);
+            padding: 0 12px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--toss-grey-800);
+            outline: none;
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236B7684' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            background-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <!-- 혜택 요약 대시보드 -->
+        <div class="dashboard">
+            <div class="dashboard-subtitle">이번 달 내가 받을 수 있는 총 여행 혜택 합계</div>
+            <div id="totalBenefitDisplay" class="dashboard-title">최대 250,000원 💸</div>
+            <div class="dashboard-helper">
+                💡 참고 예시: KTX 차비 지원금 5만 원 + 강진 반값 환급 10만 원 등<br>
+                선택한 필터와 지역에 매칭되는 실제 지원/환급 혜택들의 모의 합산 금액입니다.
+            </div>
+            <div class="dashboard-badge-container">
+                <span class="dashboard-badge">정부지원금</span>
+                <span class="dashboard-badge">지자체환급금</span>
+                <span class="dashboard-badge">무료이용/입장</span>
+            </div>
+        </div>
+
+        <!-- 필터 및 헤더 -->
+        <div class="header">
+            <h2>어떤 혜택과 여행을 찾으시나요?</h2>
+            
+            <!-- 지역별 (전국, 시/도, 군/구) 다단계 필터 -->
+            <div class="area-filter-row">
+                <select id="sidoSelect" class="area-select" onchange="onSidoChange()">
+                    <option value="0">전국 (시/도 선택)</option>
+                </select>
+                <select id="sigunguSelect" class="area-select" onchange="onSigunguChange()">
+                    <option value="0">시/군/구 선택</option>
+                </select>
+            </div>
+
+            <div class="filter-container">
+                <button id="filter-all" class="filter-chip all-active" onclick="clickAll()">🎁 혜택 전체보기</button>
+                <button id="filter-benefit" class="filter-chip category" onclick="toggleFilter('benefit')">💸 정부지원금</button>
+                <button id="filter-payback" class="filter-chip category" onclick="toggleFilter('payback')">💵 지자체환급</button>
+                <button id="filter-free" class="filter-chip category" onclick="toggleFilter('free')">🎫 무료입장/이용</button>
+                <button id="filter-eco" class="filter-chip category" onclick="toggleFilter('eco')">🌿 생태관광</button>
+                <button id="filter-barrier" class="filter-chip category" onclick="toggleFilter('barrier')">♿ 무장애여행</button>
+                <button id="filter-pet" class="filter-chip category" onclick="toggleFilter('pet')">🐶 반려동물동반</button>
+                <button id="filter-camp" class="filter-chip category" onclick="toggleFilter('camp')">🏕️ 고캠핑/야영</button>
+            </div>
+        </div>
+
+        <!-- 혼잡도 범례 -->
+        <div class="legend-container">
+            <div class="legend-item"><span class="legend-dot" style="background:var(--congestion-green)"></span>여유</div>
+            <div class="legend-item"><span class="legend-dot" style="background:var(--congestion-yellow)"></span>보통</div>
+            <div class="legend-item"><span class="legend-dot" style="background:var(--congestion-red)"></span>혼잡</div>
+        </div>
+
+        <!-- 달력 영역 -->
+        <div class="calendar-container">
+            <div class="month-display">
+                <span class="month-btn" onclick="changeMonth(-1)">&lt;</span>
+                <span id="currentMonthLabel">2026년 6월</span>
+                <span class="month-btn" onclick="changeMonth(1)">&gt;</span>
+            </div>
+            <div id="calendarGrid" class="calendar-grid"></div>
+        </div>
+
+        <!-- 바텀시트 상세 목록 -->
+        <div id="bottomSheet" class="bottom-sheet">
+            <div style="width:40px; height:5px; background:#e5e5e5; border-radius:3px; margin: 0 auto 16px; shrink: 0;"></div>
+            <div class="sheet-header">
+                <h3 id="sheetTitle" class="sheet-title">혜택 상세</h3>
+                <span onclick="closeSheet()" style="cursor:pointer; font-weight:600; color:var(--toss-grey-600)">닫기</span>
+            </div>
+            <div id="cardList" class="sheet-scroll-area"></div>
+        </div>
+        <div id="overlay" class="overlay" onclick="closeSheet()"></div>
+    </div>
+
+    <!-- 로직 연결 및 외부 데이터 로딩 -->
+    <script src="https://js.toss.im/apps-in-toss/sdk.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
