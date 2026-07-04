@@ -1140,7 +1140,24 @@ function attachTossBanner(containerId) {
     }
     const container = document.getElementById(containerId || 'tossAdBanner');
     if (!container) return;
-    if (typeof TossAds === 'undefined' || !TossAds.attachBanner || !TossAds.attachBanner.isSupported()) return;
+    
+    // 실시간 모바일 광고 SDK 연결 상태 진단 디버그 텍스트 생성
+    let debugInfo = `TossAds 객체: ${typeof TossAds}`;
+    if (typeof TossAds !== 'undefined') {
+        debugInfo += `, attachBanner: ${typeof TossAds.attachBanner}`;
+        if (TossAds.attachBanner) {
+            try { debugInfo += `, 지원여부(isSupported): ${TossAds.attachBanner.isSupported()}`; } catch(e) { debugInfo += `, 에러: ${e.message}`; }
+        }
+    }
+    const dbgEl = document.createElement('div');
+    dbgEl.style.cssText = 'font-size:9px;color:#8B95A1;text-align:center;padding:6px 0;width:100%;';
+    dbgEl.innerText = `[광고 상태 디버그] ${debugInfo}`;
+    container.appendChild(dbgEl);
+
+    if (typeof TossAds === 'undefined' || !TossAds.attachBanner || !TossAds.attachBanner.isSupported()) {
+        dbgEl.innerText += " ➡️ 토스 광고 SDK 미지원 상태";
+        return;
+    }
     try {
         activeTossAdBanner = TossAds.attachBanner(
             'ait.v2.live.c5633be2471a4b9c',
@@ -1150,16 +1167,17 @@ function attachTossBanner(containerId) {
                 tone: 'blackAndWhite',
                 variant: 'expanded',
                 callbacks: {
-                    onAdRendered: (p) => console.log('TossAd rendered:', p.slotId),
+                    onAdRendered: (p) => {
+                        console.log('TossAd rendered:', p.slotId);
+                        dbgEl.innerText = `🟢 광고 로딩 성공`;
+                    },
                     onAdFailedToRender: (p) => {
                         console.warn('TossAd failed:', p.error?.message);
-                        container.style.display = 'none';
-                        container.style.minHeight = '0';
+                        dbgEl.innerText = `🔴 광고 렌더링 실패: ${p.error?.message || '이유 미기재'}`;
                     },
                     onNoFill: (p) => {
                         console.warn('TossAd no fill');
-                        container.style.display = 'none';
-                        container.style.minHeight = '0';
+                        dbgEl.innerText = `🟡 광고 없음(No Fill): 물량 부족 또는 계약 미승인`;
                     }
                 }
             }

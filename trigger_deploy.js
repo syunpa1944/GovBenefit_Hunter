@@ -41,9 +41,9 @@ async function run() {
     const config = {
       artifactPath: path.resolve('test-app/govbenefit-hunter.ait'),
       appName: 'govbenefit-hunter',
-      deploymentId: '019f2af7-11c4-761c-bf36-9f05559c6ff5',
+      deploymentId: '019f2b01-b6e0-7be6-85a2-35eba4905ecb',
       apiKey: '5xZHDDQGkiFkDUG8_VR4DpiIiSEmsGKK8vlKIqPUH4U',
-      memo: '정부혜택달력 상용 출시 기준 오늘 날짜 동적 전환 긴급 픽스 버전',
+      memo: '정부혜택달력 상용 출시 기준 광고 정합성 상태 정밀 진단 버전',
       baseUrl: 'https://apps-in-toss.toss.im/console',
       timeoutSeconds: 300
     };
