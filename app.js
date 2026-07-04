@@ -1151,8 +1151,16 @@ function attachTossBanner(containerId) {
                 variant: 'expanded',
                 callbacks: {
                     onAdRendered: (p) => console.log('TossAd rendered:', p.slotId),
-                    onAdFailedToRender: (p) => console.warn('TossAd failed:', p.error?.message),
-                    onNoFill: (p) => console.warn('TossAd no fill')
+                    onAdFailedToRender: (p) => {
+                        console.warn('TossAd failed:', p.error?.message);
+                        container.style.display = 'none';
+                        container.style.minHeight = '0';
+                    },
+                    onNoFill: (p) => {
+                        console.warn('TossAd no fill');
+                        container.style.display = 'none';
+                        container.style.minHeight = '0';
+                    }
                 }
             }
         );

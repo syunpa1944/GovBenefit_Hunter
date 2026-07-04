@@ -1,6 +1,6 @@
 {
   "name": "govbenefit-hunter",
-  "version": "20260704-34",
+  "version": "20260704-35",
   "description": "정부혜택털기 - 여행/복지 스마트 캘린더 미니앱 최초 버전",
   "main": "app.js",
   "scripts": {
