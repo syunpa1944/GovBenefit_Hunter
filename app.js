@@ -1154,18 +1154,23 @@ function attachTossBanner(containerId) {
     dbgEl.innerText = `[광고 상태 디버그] ${debugInfo}`;
     container.appendChild(dbgEl);
 
-    // 전역 객체 수색 및 시각적 표출
-    let globalKeys = [];
-    if (typeof Toss !== 'undefined') {
-        globalKeys.push(`Toss 속성: [${Object.keys(Toss).join(', ')}]`);
+    // 전역 객체 수색 및 시각적 표출 (non-enumerable 다이렉트 투시)
+    let directCheck = `window.Toss: ${typeof window.Toss}`;
+    if (typeof window.Toss !== 'undefined') {
+        const tKeys = Object.keys(window.Toss) || [];
+        directCheck += ` (keys: [${tKeys.join(', ')}])`;
+        directCheck += `, openExternal: ${typeof window.Toss.openExternal}`;
+        directCheck += `, attachBanner: ${typeof window.Toss.attachBanner}`;
+        directCheck += `, loadRewardedAd: ${typeof window.Toss.loadRewardedAd}`;
+        directCheck += `, showRewardedAd: ${typeof window.Toss.showRewardedAd}`;
     }
-    if (typeof window !== 'undefined') {
-        const tossRelated = Object.keys(window).filter(k => k.toLowerCase().includes('toss') || k.toLowerCase().includes('ad'));
-        globalKeys.push(`전역 객체: [${tossRelated.join(', ')}]`);
+    directCheck += ` | window.TossAds: ${typeof window.TossAds}`;
+    if (typeof window.TossAds !== 'undefined') {
+        directCheck += `, attachBanner: ${typeof window.TossAds.attachBanner}`;
     }
     const dbgEl2 = document.createElement('div');
     dbgEl2.style.cssText = 'font-size:9px;color:#0064FF;text-align:center;padding:2px 0 6px;width:100%;word-break:break-all;';
-    dbgEl2.innerText = `🔍 [브릿지 분석] ${globalKeys.join(' | ')}`;
+    dbgEl2.innerText = `🔍 [브릿지 분석] ${directCheck}`;
     container.appendChild(dbgEl2);
 
     if (typeof TossAds === 'undefined' || !TossAds.attachBanner || !TossAds.attachBanner.isSupported()) {
