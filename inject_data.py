@@ -412,6 +412,7 @@ def build_data():
                     "benefits": specific_benefits
                 })
 
+    data["__all_cultural_events__"] = cultural_events
     data["__barrier__"] = barrier_processed
     data["__pet__"] = pet_processed
     
