@@ -978,7 +978,8 @@ function openSheet(dateStr, items) {
         // 행사 신청 버튼 딱 1개만 정의 (중복 다중 버튼 제거)
         let applyBtnsHtml = '';
         if (mainLink) {
-            applyBtnsHtml = `<button class="card-btn open-url-btn" data-url="${mainLink.replace(/"/g,'&quot;')}" style="width:80%;max-width:360px;">행사 신청</button>`;
+            const btnLabel = (item.tags || []).includes('culture') ? '상세내용 및 예매 바로가기 🔗' : '행사 신청/안내 바로가기';
+            applyBtnsHtml = `<button class="card-btn open-url-btn" data-url="${mainLink.replace(/"/g,'&quot;')}" style="width:80%;max-width:360px;">${btnLabel}</button>`;
         }
 
         const detailHtml = `
