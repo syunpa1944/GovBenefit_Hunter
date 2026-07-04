@@ -68,6 +68,14 @@ def fetch_cultural_events():
             if not page_items:
                 break
                 
+            # 정부 혜택 및 공공 복지 연계 가능한 키워드 목록 정의
+            BENEFIT_KEYWORDS = [
+                "국립", "시립", "도립", "군립", "구립", "문화원", "예술회관", 
+                "도서관", "박물관", "미술관", "문화센터", "복지", "공원", "지자체",
+                "특별시", "광역시", "체육회", "공공", "무료", "할인", "감면", "지원", 
+                "페이백", "문화누리", "다자녀", "바우처", "전통시장", "체험"
+            ]
+
             for item in page_items:
                 title = item.findtext("title")
                 start_date = item.findtext("startDate")
@@ -79,6 +87,14 @@ def fetch_cultural_events():
                 thumbnail = item.findtext("thumbnail")
                 
                 if not title or not start_date or not end_date:
+                    continue
+                
+                # 장소와 제목을 결합하여 정부/공공/혜택 관련 키워드가 들어있는지 검증
+                text_to_check = (title + " " + (place or "")).lower()
+                is_benefit_related = any(kw in text_to_check for kw in BENEFIT_KEYWORDS)
+                
+                if not is_benefit_related:
+                    # 정부혜택달력의 정체성에 어긋나는 민간 상업용 연극/콘서트는 제외
                     continue
                     
                 events.append({
