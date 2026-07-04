@@ -26,75 +26,78 @@ def fetch_cultural_events():
     from_date = today.strftime("%Y%m%d")
     to_date = (today + timedelta(days=60)).strftime("%Y%m%d")
     
-    params = {
-        'serviceKey': service_key,
-        'from': from_date,
-        'to': to_date,
-        'cPage': '1',
-        'rows': '100'  # 최대 수집 개수
-    }
+    events = []
     
-    try:
-        print(f"API 호출 시작: {from_date} ~ {to_date}")
-        response = requests.get(url, params=params, timeout=10)
+    # 1페이지부터 5페이지까지 순회하며 데이터 대량 수집 (최대 500개)
+    for page in range(1, 6):
+        params = {
+            'serviceKey': service_key,
+            'from': from_date,
+            'to': to_date,
+            'cPage': str(page),
+            'rows': '100'
+        }
         
-        if response.status_code != 200:
-            print(f"API 요청 실패 (HTTP 상태 코드: {response.status_code})")
-            return []
+        try:
+            print(f"API 호출 시작 (페이지 {page}): {from_date} ~ {to_date}")
+            response = requests.get(url, params=params, timeout=10)
             
-        content = response.content
-        
-        # XML 노드 파싱 시작
-        root = ET.fromstring(content)
-        
-        # 호출 결과 상태 코드 점검
-        header = root.find("header")
-        if header is not None:
-            result_code = header.findtext("resultCode")
-            result_msg = header.findtext("resultMsg")
-            if result_code != "00":
-                print(f"API 응답 에러: {result_msg} (코드: {result_code})")
-                return []
+            if response.status_code != 200:
+                print(f"API 요청 실패 (페이지 {page}, HTTP 상태 코드: {response.status_code})")
+                break
                 
-        body = root.find("body")
-        if body is None:
-            return []
+            content = response.content
+            root = ET.fromstring(content)
             
-        items_node = body.find("items")
-        if items_node is None:
-            return []
-            
-        events = []
-        for item in items_node.findall("item"):
-            title = item.findtext("title")
-            start_date = item.findtext("startDate")
-            end_date = item.findtext("endDate")
-            place = item.findtext("place")
-            realm_name = item.findtext("realmName")
-            area = item.findtext("area")
-            url_link = item.findtext("url")
-            thumbnail = item.findtext("thumbnail")
-            
-            if not title or not start_date or not end_date:
-                continue
+            header = root.find("header")
+            if header is not None:
+                result_code = header.findtext("resultCode")
+                if result_code != "00":
+                    print(f"API 응답 에러 (페이지 {page})")
+                    break
+                    
+            body = root.find("body")
+            if body is None:
+                break
                 
-            events.append({
-                "title": title.strip(),
-                "start_date": start_date.strip(),
-                "end_date": end_date.strip(),
-                "place": (place or "전국").strip(),
-                "realmName": (realm_name or "행사/축제").strip(),
-                "area": (area or "").strip(),
-                "url": (url_link or "https://www.culture.go.kr/").strip(),
-                "thumbnail": (thumbnail or "").strip()
-            })
+            items_node = body.find("items")
+            if items_node is None:
+                break
+                
+            page_items = items_node.findall("item")
+            if not page_items:
+                break
+                
+            for item in page_items:
+                title = item.findtext("title")
+                start_date = item.findtext("startDate")
+                end_date = item.findtext("endDate")
+                place = item.findtext("place")
+                realm_name = item.findtext("realmName")
+                area = item.findtext("area")
+                url_link = item.findtext("url")
+                thumbnail = item.findtext("thumbnail")
+                
+                if not title or not start_date or not end_date:
+                    continue
+                    
+                events.append({
+                    "title": title.strip(),
+                    "start_date": start_date.strip(),
+                    "end_date": end_date.strip(),
+                    "place": (place or "전국").strip(),
+                    "realmName": (realm_name or "행사/축제").strip(),
+                    "area": (area or "").strip(),
+                    "url": (url_link or "https://www.culture.go.kr/").strip(),
+                    "thumbnail": (thumbnail or "").strip()
+                })
+                
+        except Exception as e:
+            print(f"페이지 {page} 수집 중 오류: {e}")
+            break
             
-        print(f"성공적으로 {len(events)}개의 문화 정보 수집 완료!")
-        return events
-        
-    except Exception as e:
-        print(f"fetch_cultural_events 오류 발생: {e}")
-        return []
+    print(f"성공적으로 {len(events)}개의 문화 정보 수집 완료!")
+    return events
 
 if __name__ == "__main__":
     # 단독 테스트 코드
