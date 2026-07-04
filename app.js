@@ -1246,27 +1246,106 @@ function tryShowRewardedAd() {
                 case 'reward':
                     localStorage.setItem('rewardedOnExit', 'done');
                     addRewardPoints(1);
-                    // 리워드 획득 성공 후 즉시 웹뷰 종료 처리
+                    // 광고 완료 후 즉시 종료 확인 모달 호출
                     setTimeout(() => {
-                        window.close();
+                        showExitConfirmModal();
                     }, 500);
                     break;
                 case 'dismissed':
                 case 'failedToShow':
                     rewardedAdLoaded = false;
                     preloadRewardedAd();
-                    // 광고 화면이 닫혔으므로 웹뷰 종료 처리
-                    window.close();
+                    // 광고 종료/실패 후 종료 확인 모달 호출
+                    showExitConfirmModal();
                     break;
             }
         },
         onError: () => {
             rewardedAdLoaded = false;
-            window.close();
+            showExitConfirmModal();
         }
     });
     localStorage.setItem('rewardedOnExit', 'pending');
     return true;
+}
+
+// 🚪 프리미엄 다크 테마 커스텀 종료 확인 모달 팝업
+function showExitConfirmModal() {
+    if (document.getElementById('exit-confirm-modal')) return;
+
+    const modal = document.createElement('div');
+    modal.id = 'exit-confirm-modal';
+    modal.style.cssText = `
+        position: fixed;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.65);
+        display: flex; align-items: center; justify-content: center;
+        z-index: 10000;
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
+    `;
+
+    modal.innerHTML = `
+        <div style="
+            background: #1c222e;
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 20px;
+            padding: 24px;
+            width: 85%;
+            max-width: 320px;
+            text-align: center;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            animation: tossModalScale 0.25s ease-out;
+        ">
+            <div style="font-size: 32px; margin-bottom: 12px;">👋</div>
+            <h3 style="font-size: 18px; font-weight: 700; color: #ffffff; margin-bottom: 8px;">종료하시겠습니까?</h3>
+            <p style="font-size: 13px; color: #9ca3af; margin-bottom: 24px; line-height: 1.4;">
+                오늘의 복지 혜택과 실시간 행사 일정을 모두 확인하셨나요?
+            </p>
+            <div style="display: flex; gap: 10px; justify-content: center;">
+                <button id="btn-modal-cancel" style="
+                    flex: 1; padding: 12px;
+                    background: rgba(255,255,255,0.05);
+                    border: 1px solid rgba(255,255,255,0.08);
+                    border-radius: 12px;
+                    color: #e5e7eb; font-weight: 600; font-size: 14px;
+                    cursor: pointer; transition: all 0.2s;
+                ">취소</button>
+                <button id="btn-modal-exit" style="
+                    flex: 1; padding: 12px;
+                    background: #0064ff;
+                    border: none; border-radius: 12px;
+                    color: #ffffff; font-weight: 600; font-size: 14px;
+                    box-shadow: 0 4px 12px rgba(0,100,255,0.3);
+                    cursor: pointer; transition: all 0.2s;
+                ">종료</button>
+            </div>
+        </div>
+        <style>
+            @keyframes tossModalScale {
+                from { transform: scale(0.9); opacity: 0; }
+                to { transform: scale(1); opacity: 1; }
+            }
+        </style>
+    `;
+
+    document.body.appendChild(modal);
+
+    document.getElementById('btn-modal-cancel').onclick = () => {
+        document.body.removeChild(modal);
+    };
+
+    document.getElementById('btn-modal-exit').onclick = () => {
+        try {
+            if (typeof activeTossAdBanner !== 'undefined' && activeTossAdBanner) {
+                activeTossAdBanner.destroy();
+            }
+            if (typeof TossAds !== 'undefined' && TossAds.destroyAll && TossAds.destroyAll.isSupported()) {
+                TossAds.destroyAll();
+            }
+        } catch(e){}
+        window.close();
+    };
 }
 
 // 강제종료 리워드 재개 처리
@@ -1313,9 +1392,9 @@ window.onload = () => {
                     onEvent: () => {
                         console.log('Toss Back Key Pressed. Triggering exit reward ad...');
                         const adStarted = tryShowRewardedAd();
-                        // 광고가 아직 로드되지 않았거나 송출할 수 없는 경우 즉시 앱 닫기
+                        // 광고가 아직 로드되지 않았거나 송출할 수 없는 경우에도 바로 끄지 않고 종료 확인 모달 노출
                         if (!adStarted) {
-                            window.close();
+                            showExitConfirmModal();
                         }
                     }
                 });
