@@ -1150,9 +1150,23 @@ function attachTossBanner(containerId) {
         }
     }
     const dbgEl = document.createElement('div');
-    dbgEl.style.cssText = 'font-size:9px;color:#8B95A1;text-align:center;padding:6px 0;width:100%;';
+    dbgEl.style.cssText = 'font-size:9px;color:#8B95A1;text-align:center;padding:4px 0 2px;width:100%;';
     dbgEl.innerText = `[광고 상태 디버그] ${debugInfo}`;
     container.appendChild(dbgEl);
+
+    // 전역 객체 수색 및 시각적 표출
+    let globalKeys = [];
+    if (typeof Toss !== 'undefined') {
+        globalKeys.push(`Toss 속성: [${Object.keys(Toss).join(', ')}]`);
+    }
+    if (typeof window !== 'undefined') {
+        const tossRelated = Object.keys(window).filter(k => k.toLowerCase().includes('toss') || k.toLowerCase().includes('ad'));
+        globalKeys.push(`전역 객체: [${tossRelated.join(', ')}]`);
+    }
+    const dbgEl2 = document.createElement('div');
+    dbgEl2.style.cssText = 'font-size:9px;color:#0064FF;text-align:center;padding:2px 0 6px;width:100%;word-break:break-all;';
+    dbgEl2.innerText = `🔍 [브릿지 분석] ${globalKeys.join(' | ')}`;
+    container.appendChild(dbgEl2);
 
     if (typeof TossAds === 'undefined' || !TossAds.attachBanner || !TossAds.attachBanner.isSupported()) {
         dbgEl.innerText += " ➡️ 토스 광고 SDK 미지원 상태";
