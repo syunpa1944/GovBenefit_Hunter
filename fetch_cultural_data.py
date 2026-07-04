@@ -21,16 +21,16 @@ def fetch_cultural_events():
 
     url = "https://apis.data.go.kr/B553457/cultureinfo/period2"
     
-    # 오늘 기준 향후 60일간의 문화 정보 수집
+    # 오늘 기준 향후 180일(6개월)간의 문화 정보 대량 수집
     today = datetime.now()
     from_date = today.strftime("%Y%m%d")
-    to_date = (today + timedelta(days=60)).strftime("%Y%m%d")
+    to_date = (today + timedelta(days=180)).strftime("%Y%m%d")
     
     events = []
     seen_titles = set()
     
-    # 1페이지부터 5페이지까지 순회하며 데이터 대량 수집 (최대 500개)
-    for page in range(1, 6):
+    # 1페이지부터 10페이지까지 순회하며 데이터 대량 수집 (최대 1000개 모수 확보)
+    for page in range(1, 11):
         params = {
             'serviceKey': service_key,
             'from': from_date,
@@ -69,12 +69,15 @@ def fetch_cultural_events():
             if not page_items:
                 break
                 
-            # 정부 혜택 및 공공 복지 연계 가능한 키워드 목록 정의
+            # 정부 혜택 및 공공 복지 연계 가능한 키워드 목록 정의 (대폭 확장)
             BENEFIT_KEYWORDS = [
                 "국립", "시립", "도립", "군립", "구립", "문화원", "예술회관", 
                 "도서관", "박물관", "미술관", "문화센터", "복지", "공원", "지자체",
                 "특별시", "광역시", "체육회", "공공", "무료", "할인", "감면", "지원", 
-                "페이백", "문화누리", "다자녀", "바우처", "전통시장", "체험"
+                "페이백", "문화누리", "다자녀", "바우처", "전통시장", "체험", "교육",
+                "축제", "페스티벌", "마당", "야시장", "전통", "민속", "예술", "음악회",
+                "콘서트", "전시회", "기획전", "특별전", "캠핑", "물놀이", "역사", "가이드",
+                "투어", "마을", "숲", "생태", "아카데미", "강좌"
             ]
 
             for item in page_items:
