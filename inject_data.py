@@ -2,6 +2,7 @@ import json
 import os
 from datetime import datetime, timedelta
 import urllib.parse
+from fetch_cultural_data import fetch_cultural_events
 
 # 1. 행정구역 코드 정의
 AREA_MAP = {
@@ -185,6 +186,9 @@ def build_data():
     end_date = datetime(2026, 12, 31)
     total_days = (end_date - start_date).days + 1
 
+    # 실시간 문화정보 API 수집 기동
+    cultural_events = fetch_cultural_events()
+
     # 무장애 및 반려동물 메타데이터 수립 (필터 기동 시 전국 어디서나 로딩)
     barrier_processed = []
     for i, item in enumerate(REAL_BARRIERS):
@@ -340,6 +344,68 @@ def build_data():
                     "mapUrl": f"https://www.google.com/maps/search/?api=1&query={urllib.parse.quote(fest['addr1'])}",
                     "isAd": False,
                     "congestion": "green" if (i + d) % 3 == 0 else ("yellow" if (i + d) % 3 == 1 else "red"),
+                    "benefits": specific_benefits
+                })
+
+        # 3. 실시간 공공 문화정보 API 수집 일정 융합
+        for i, ev in enumerate(cultural_events):
+            try:
+                ev_start = datetime.strptime(ev["start_date"], "%Y%m%d")
+                ev_end = datetime.strptime(ev["end_date"], "%Y%m%d")
+            except Exception:
+                continue
+                
+            if ev_start <= curr_date <= ev_end:
+                ac, an, sc, sn = get_area_from_address(ev["place"] or ev["area"])
+                
+                realm = ev["realmName"]
+                # 분야별 매핑
+                if "전시" in realm:
+                    color = "#AF52DE"
+                    tags = ["culture", "exhibition"]
+                elif "연극" in realm or "뮤지컬" in realm or "오페라" in realm:
+                    color = "#FF9500"
+                    tags = ["culture", "theater"]
+                elif "행사" in realm or "축제" in realm:
+                    color = "#0064FF"
+                    tags = ["culture", "festival"]
+                elif "아동" in realm or "가족" in realm:
+                    color = "#34C759"
+                    tags = ["culture", "family"]
+                elif "교육" in realm or "체험" in realm or "도서" in realm:
+                    color = "#FF2D55"
+                    tags = ["culture", "education"]
+                else:
+                    color = "#5AC8FA"
+                    tags = ["culture"]
+                    
+                specific_benefits = global_benefits.copy()
+                if ac == 11:
+                    specific_benefits.append({"name": "서울사랑상품권", "desc": "행사장 인근 서울 가맹점 결제 시 최대 10% 페이백", "link": "https://seoulpay.seoul.go.kr/"})
+                elif ac == 28:
+                    specific_benefits.append({"name": "인천사랑상품권 (인천e음)", "desc": "인천 축제 현장 결제 시 최대 10% 캐시백", "link": "https://www.incheon.go.kr/"})
+                elif ac == 26:
+                    specific_benefits.append({"name": "동백전 (부산화폐)", "desc": "부산 전역 축제 현장 결제 시 최대 10% 즉시 캐시백", "link": "https://www.bscard.or.kr/"})
+                elif ac == 41:
+                    specific_benefits.append({"name": "경기지역화폐", "desc": "경기도 내 축제 행사장 결제 시 최대 10% 인센티브", "link": "https://www.gmoney.or.kr/"})
+
+                data[date_key].append({
+                    "id": 1000000 + i * 1000 + d,
+                    "title": ev["title"],
+                    "amount": "공공 문화 할인 혜택 적용 가능",
+                    "period": f"{ev_start.strftime('%Y.%m.%d')} ~ {ev_end.strftime('%Y.%m.%d')}",
+                    "type": "행사",
+                    "source": ev["url"],
+                    "note": f"[{an} 문화 알림] {ev['title']}. 장소: {ev['place']}. 분야: {realm}",
+                    "color": color,
+                    "tags": tags,
+                    "areaCd": ac,
+                    "areaNm": an,
+                    "sigunguCd": sc,
+                    "sigunguNm": sn,
+                    "mapUrl": f"https://www.google.com/maps/search/?api=1&query={urllib.parse.quote(ev['place'])}",
+                    "isAd": False,
+                    "congestion": "green",
                     "benefits": specific_benefits
                 })
 
