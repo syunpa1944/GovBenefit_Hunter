@@ -1,0 +1,47 @@
+name: Daily Benefit Data Auto Collector
+
+on:
+  schedule:
+    # 매일 한국 시간 밤 12시 (UTC 15:00) 정각에 자동 구동 설정
+    - cron: '0 15 * * *'
+  workflow_dispatch:
+    # 깃허브 관리자 페이지에서 필요시 수동 강제 즉시 실행 버튼 활성화
+    inputs:
+      reason:
+        description: 'Manual Trigger Reason'
+        required: false
+        default: 'Manual update check'
+
+permissions:
+  contents: write
+
+jobs:
+  collect-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        # 향후 공공 API 연동 시 필요한 패키지들 사전 준비
+        pip install requests pandas openpyxl
+
+    - name: Run Benefit Data Injector
+      run: |
+        # 데이터 수집 및 12월 연간 데이터 파일 재생성 실행
+        python inject_data.py
+
+    - name: Commit and Push Updated Data
+      run: |
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git add data.js data.json
+        # 변경사항이 있는 경우에만 안전 커밋 및 푸시 가동
+        git diff --quiet && git diff --staged --quiet || (git commit -m "chore: 공공데이터 일간 캘린더 데이터 자동 갱신 [skip ci]" && git push)

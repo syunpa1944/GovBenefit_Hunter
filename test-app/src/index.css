@@ -1,6 +1,0 @@
-* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-body {
-  margin: 0; padding: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Pretendard", sans-serif;
-  background-color: #FAFAFB; color: #333D4B; user-select: none;
-}
