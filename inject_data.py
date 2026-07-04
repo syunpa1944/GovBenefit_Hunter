@@ -356,6 +356,9 @@ def build_data():
                 continue
                 
             if ev_start <= curr_date <= ev_end:
+                # 2단계: 동일 날짜 내 동일 제목 중복 등록 방지
+                if any(existing["title"] == ev["title"] for existing in data[date_key]):
+                    continue
                 ac, an, sc, sn = get_area_from_address(ev["place"] or ev["area"])
                 
                 realm = ev["realmName"]

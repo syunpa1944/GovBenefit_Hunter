@@ -27,6 +27,7 @@ def fetch_cultural_events():
     to_date = (today + timedelta(days=60)).strftime("%Y%m%d")
     
     events = []
+    seen_titles = set()
     
     # 1페이지부터 5페이지까지 순회하며 데이터 대량 수집 (최대 500개)
     for page in range(1, 6):
@@ -89,16 +90,22 @@ def fetch_cultural_events():
                 if not title or not start_date or not end_date:
                     continue
                 
+                title_clean = title.strip()
+                # 1단계: API 전체 수집 데이터셋 내 중복 제거
+                if title_clean in seen_titles:
+                    continue
+                
                 # 장소와 제목을 결합하여 정부/공공/혜택 관련 키워드가 들어있는지 검증
-                text_to_check = (title + " " + (place or "")).lower()
+                text_to_check = (title_clean + " " + (place or "")).lower()
                 is_benefit_related = any(kw in text_to_check for kw in BENEFIT_KEYWORDS)
                 
                 if not is_benefit_related:
                     # 정부혜택달력의 정체성에 어긋나는 민간 상업용 연극/콘서트는 제외
                     continue
                     
+                seen_titles.add(title_clean)
                 events.append({
-                    "title": title.strip(),
+                    "title": title_clean,
                     "start_date": start_date.strip(),
                     "end_date": end_date.strip(),
                     "place": (place or "전국").strip(),
