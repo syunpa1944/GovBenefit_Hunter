@@ -41,9 +41,9 @@ async function run() {
     const config = {
       artifactPath: path.resolve('test-app/govbenefit-hunter.ait'),
       appName: 'govbenefit-hunter',
-      deploymentId: '019f2b06-bf01-77da-bd6e-b265696cc5d5',
+      deploymentId: '019f2b97-2926-7f8a-959e-33e9da5f561f',
       apiKey: '5xZHDDQGkiFkDUG8_VR4DpiIiSEmsGKK8vlKIqPUH4U',
-      memo: '정부혜택달력 상용 출시 기준 광고 정합성 2차 논에뉴머러블 브릿지 정밀 수사 버전',
+      memo: '정부혜택달력 상용 출시 최종 이탈방지 리워드 광고 후킹 및 자동 닫기 연동 버전',
       baseUrl: 'https://apps-in-toss.toss.im/console',
       timeoutSeconds: 300
     };

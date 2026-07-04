@@ -1,3 +1,8 @@
+// 로드된 2.x 프레임워크 번들로부터 TossAds 전역 바인딩 확보
+if (typeof TossAds === 'undefined' && window.AppsInToss) {
+    window.TossAds = window.AppsInToss.TossAds;
+}
+
 // 오늘 날짜 동적 연동 (정식 상용 출시 반영)
 const FIXED_TODAY = new Date();
 const ADS_ENABLED = true; // 광고 모듈 ON/OFF (true로 변경 시 활성화)
@@ -1211,10 +1216,10 @@ let rewardedAdLoaded = false;
 const REWARDED_AD_ID = 'ait.v2.live.be0a965d07e0432b'; // 실제 상용 출시용 리워드 광고 ID
 
 function preloadRewardedAd() {
-    if (typeof loadRewardedAd === 'undefined' || !loadRewardedAd.isSupported()) {
+    if (typeof loadFullScreenAd === 'undefined' || !loadFullScreenAd.isSupported()) {
         return;
     }
-    loadRewardedAd({
+    loadFullScreenAd({
         options: { adGroupId: REWARDED_AD_ID },
         onEvent: (event) => {
             if (event.type === 'loaded') {
@@ -1229,26 +1234,34 @@ function preloadRewardedAd() {
 }
 
 function tryShowRewardedAd() {
-    if (!rewardedAdLoaded || typeof showRewardedAd === 'undefined' || !showRewardedAd.isSupported()) {
+    if (!rewardedAdLoaded || typeof showFullScreenAd === 'undefined' || !showFullScreenAd.isSupported()) {
         return false;
     }
-    showRewardedAd({
+    showFullScreenAd({
         options: { adGroupId: REWARDED_AD_ID },
         onEvent: (event) => {
             switch (event.type) {
+                case 'userEarnedReward':
                 case 'reward':
                     localStorage.setItem('rewardedOnExit', 'done');
                     addRewardPoints(1);
+                    // 리워드 획득 성공 후 즉시 웹뷰 종료 처리
+                    setTimeout(() => {
+                        window.close();
+                    }, 500);
                     break;
                 case 'dismissed':
                 case 'failedToShow':
                     rewardedAdLoaded = false;
                     preloadRewardedAd();
+                    // 광고 화면이 닫혔으므로 웹뷰 종료 처리
+                    window.close();
                     break;
             }
         },
         onError: () => {
             rewardedAdLoaded = false;
+            window.close();
         }
     });
     localStorage.setItem('rewardedOnExit', 'pending');
@@ -1290,6 +1303,24 @@ window.onload = () => {
             });
         } else {
             preloadRewardedAd();
+        }
+
+        // 토스 뒤로가기 버튼 클릭 가로채기 ➡️ 리워드 광고 유도 후 앱 종료
+        if (typeof graniteEvent !== 'undefined') {
+            try {
+                graniteEvent.addEventListener('backEvent', {
+                    onEvent: () => {
+                        console.log('Toss Back Key Pressed. Triggering exit reward ad...');
+                        const adStarted = tryShowRewardedAd();
+                        // 광고가 아직 로드되지 않았거나 송출할 수 없는 경우 즉시 앱 닫기
+                        if (!adStarted) {
+                            window.close();
+                        }
+                    }
+                });
+            } catch (e) {
+                console.warn('graniteEvent addEventListener error:', e);
+            }
         }
     }
 
