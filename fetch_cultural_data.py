@@ -98,14 +98,7 @@ def fetch_cultural_events():
                 if title_clean in seen_titles:
                     continue
                 
-                # 장소와 제목을 결합하여 정부/공공/혜택 관련 키워드가 들어있는지 검증
-                text_to_check = (title_clean + " " + (place or "")).lower()
-                is_benefit_related = any(kw in text_to_check for kw in BENEFIT_KEYWORDS)
-                
-                if not is_benefit_related:
-                    # 정부혜택달력의 정체성에 어긋나는 민간 상업용 연극/콘서트는 제외
-                    continue
-                    
+                # 모든 행사 및 컨텐츠를 그대로 송출 (사전 필터링 해제)
                 seen_titles.add(title_clean)
                 events.append({
                     "title": title_clean,
