@@ -1,11 +1,11 @@
-// 오늘 날짜 고정 (가이드 및 명세 준수)
-const FIXED_TODAY = new Date(2026, 5, 25); // 2026년 6월 25일
+// 오늘 날짜 동적 연동 (정식 상용 출시 반영)
+const FIXED_TODAY = new Date();
 const ADS_ENABLED = true; // 광고 모듈 ON/OFF (true로 변경 시 활성화)
 const REWARD_KEY = 'rewardPoints';
 let currentYear = FIXED_TODAY.getFullYear();
 let currentMonth = FIXED_TODAY.getMonth();
 
-const todayStr = "2026-06-25";
+const todayStr = `${FIXED_TODAY.getFullYear()}-${String(FIXED_TODAY.getMonth() + 1).padStart(2, '0')}-${String(FIXED_TODAY.getDate()).padStart(2, '0')}`;
 let benefitsData = {};
 let barrierData = [];  // 무장애 시설 (필터 시 전국 상시 노출)
 let petData = [];      // 반려동물 동반 시설 (필터 시 전국 상시 노출)
