@@ -412,6 +412,25 @@ def build_data():
                     "benefits": specific_benefits
                 })
 
+    # 혜택 데이터 정규화 마스터 풀 구성
+    benefits_pool = global_benefits.copy()
+    local_pay_benefits = [
+        {"name": "서울사랑상품권", "desc": "행사장 인근 서울 가맹점 결제 시 최대 10% 페이백", "link": "https://seoulpay.seoul.go.kr/"},
+        {"name": "인천사랑상품권 (인천e음)", "desc": "인천 축제 현장 결제 시 최대 10% 캐시백", "link": "https://www.incheon.go.kr/"},
+        {"name": "동백전 (부산화폐)", "desc": "부산 전역 축제 현장 결제 시 최대 10% 즉시 캐시백", "link": "https://www.bscard.or.kr/"},
+        {"name": "경기지역화폐", "desc": "경기도 내 축제 행사장 결제 시 최대 10% 인센티브", "link": "https://www.gmoney.or.kr/"}
+    ]
+    benefits_pool.extend(local_pay_benefits)
+    data["__benefits_pool__"] = benefits_pool
+
+    # 데이터 내의 모든 benefits 목록을 이름 문자열 배열로 전격 압축 정규화 (37MB -> 400KB 경량화 핵심)
+    for key in list(data.keys()):
+        if isinstance(data[key], list):
+            for item in data[key]:
+                if isinstance(item, dict) and "benefits" in item:
+                    # 혜택 객체 배열을 이름들의 문자열 리스트로 치환
+                    item["benefits"] = [b["name"] for b in item["benefits"] if isinstance(b, dict) and "name" in b]
+
     data["__all_cultural_events__"] = cultural_events
     data["__barrier__"] = barrier_processed
     data["__pet__"] = pet_processed

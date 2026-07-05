@@ -136,32 +136,65 @@ async function loadBenefitsData() {
     render();
     updateDashboard();
 
-    // 2단계: 대용량 공공데이터(data.js)를 백그라운드 비동기로 로드합니다.
-    const script = document.createElement('script');
-    script.src = 'data.js';
-    script.async = true;
-
-    script.onload = () => {
-        console.log("공공데이터 실데이터 패키지 비동기 적재 성공.");
-        if (window.BENEFITS_DATA && Object.keys(window.BENEFITS_DATA).length > 0) {
-            const raw = window.BENEFITS_DATA;
-            // 무장애 및 반려동물 메타데이터 분리 탑재
-            barrierData = raw["__barrier__"] || [];
-            petData = raw["__pet__"] || [];
-            // 순수 날짜 데이터만 할당
-            benefitsData = Object.fromEntries(
-                Object.entries(raw).filter(([k]) => !k.startsWith('__'))
-            );
+    // 2단계: 최신 실시간 서버 데이터 동기화 (런타임 fetch 기동!)
+    let remoteLoaded = false;
+    const REMOTE_DATA_URL = 'https://raw.githubusercontent.com/syunpa1944/GovBenefit_Hunter/main/data.json';
+    
+    try {
+        console.log("실시간 서버 원격 데이터 동기화 요청 중...");
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 4000); // 4초 타임아웃으로 모바일 지연 차단
+        
+        const res = await fetch(REMOTE_DATA_URL, { signal: controller.signal });
+        clearTimeout(timeoutId);
+        
+        if (res.ok) {
+            const raw = await res.json();
+            if (raw && Object.keys(raw).length > 0) {
+                console.log("성공: 원격 서버로부터 실시간 최신 데이터를 100% 동기화 적재했습니다!");
+                barrierData = raw["__barrier__"] || [];
+                petData = raw["__pet__"] || [];
+                benefitsData = Object.fromEntries(
+                    Object.entries(raw).filter(([k]) => !k.startsWith('__'))
+                );
+                // 혜택 풀 데이터 저장
+                window.BENEFITS_DATA = raw;
+                
+                preprocessDataByAddress();
+                render();
+                updateDashboard();
+                remoteLoaded = true;
+            }
         }
-        preprocessDataByAddress(); // 주소 기반 행정구역 분류 정합성 보정 기동!
-        render();
-        updateDashboard();
-    };
+    } catch (e) {
+        console.warn("원격 실시간 서버 동기화 실패 (오프라인 또는 타임아웃). 로컬 번들 적재로 우회합니다.", e);
+    }
 
-    script.onerror = (err) => {
-        console.warn("data.js 비동기 로딩 실패. 백업 데이터를 대체 탑재합니다.", err);
-        // 로컬 실행(더블 클릭) 대비 완벽한 백업 데이터 주입
-        benefitsData = {
+    // 3단계: 원격 데이터 획득 실패 시 Fallback 로컬 data.js 비동기 로드
+    if (!remoteLoaded) {
+        const script = document.createElement('script');
+        script.src = 'data.js';
+        script.async = true;
+
+        script.onload = () => {
+            console.log("공공데이터 로컬 패키지 비동기 적재 성공.");
+            if (window.BENEFITS_DATA && Object.keys(window.BENEFITS_DATA).length > 0) {
+                const raw = window.BENEFITS_DATA;
+                barrierData = raw["__barrier__"] || [];
+                petData = raw["__pet__"] || [];
+                benefitsData = Object.fromEntries(
+                    Object.entries(raw).filter(([k]) => !k.startsWith('__'))
+                );
+            }
+            preprocessDataByAddress();
+            render();
+            updateDashboard();
+        };
+
+        script.onerror = (err) => {
+            console.warn("data.js 비동기 로딩 실패. 백업 데이터를 대체 탑재합니다.", err);
+            // 로컬 실행(더블 클릭) 대비 완벽한 백업 데이터 주입
+            benefitsData = {
             "2026-06-25": [
             {
               "id": 2000,
@@ -956,19 +989,26 @@ function openSheet(dateStr, items) {
                 <div class="benefits-section">
                     <div class="benefits-section-title">🎟️ 이 행사에서 쓸 수 있는 혜택</div>
                     ${item.benefits.map(function(b) {
-                        const isUsed = usedBenefits.includes(b.name);
-                        const canUse = !b.eligible || userEligibility.includes(b.eligible);
+                        // 혜택 정규화 복원 (BOM 다이어트 최적화 해제)
+                        let targetBenefit = b;
+                        if (typeof b === 'string') {
+                            const pool = (window.BENEFITS_DATA && window.BENEFITS_DATA.__benefits_pool__) || [];
+                            targetBenefit = pool.find(x => x.name === b) || { name: b, desc: '상세 정보는 안내 페이지 참조', link: mainLink };
+                        }
+                        
+                        const isUsed = usedBenefits.includes(targetBenefit.name);
+                        const canUse = !targetBenefit.eligible || userEligibility.includes(targetBenefit.eligible);
                         const rowStyle = isUsed ? 'opacity:0.6;background:var(--toss-grey-100);' : (!canUse ? 'opacity:0.45;' : '');
                         const nameStyle = isUsed ? 'text-decoration:line-through;color:var(--toss-grey-600);' : (!canUse ? 'color:var(--toss-grey-500);' : '');
                         const lockBadge = !canUse && !isUsed ? '<span style="font-size:9px;color:var(--toss-grey-500);margin-left:4px;">🔒 자격선택 필요</span>' : '';
                         return '<div class="linked-benefit-row"' + (rowStyle ? ' style="' + rowStyle + '"' : '') + '>' +
-                            '<input type="checkbox" class="benefit-checkbox" data-benefit-name="' + b.name.replace(/"/g,'&quot;') + '"' + (isUsed ? ' checked' : '') +
+                            '<input type="checkbox" class="benefit-checkbox" data-benefit-name="' + targetBenefit.name.replace(/"/g,'&quot;') + '"' + (isUsed ? ' checked' : '') +
                             ' style="width:16px;height:16px;cursor:pointer;accent-color:var(--toss-blue);flex-shrink:0;margin-right:8px;"' + (!canUse && !isUsed ? ' disabled' : '') + ' />' +
                             '<div class="linked-benefit-info" style="flex:1;">' +
-                            '<div class="linked-benefit-name"' + (nameStyle ? ' style="' + nameStyle + '"' : '') + '>💸 ' + b.name + lockBadge + '</div>' +
-                            '<div class="linked-benefit-desc">' + b.desc + '</div>' +
+                            '<div class="linked-benefit-name"' + (nameStyle ? ' style="' + nameStyle + '"' : '') + '>💸 ' + targetBenefit.name + lockBadge + '</div>' +
+                            '<div class="linked-benefit-desc">' + targetBenefit.desc + '</div>' +
                             '</div>' +
-                            '<button class="linked-benefit-btn open-url-btn" data-url="' + b.link.replace(/"/g,'&quot;') + '"' + ((isUsed || !canUse) ? ' disabled style="background:var(--toss-grey-300);color:var(--toss-grey-500);cursor:not-allowed;"' : '') + '>신청</button>' +
+                            '<button class="linked-benefit-btn open-url-btn" data-url="' + targetBenefit.link.replace(/"/g,'&quot;') + '"' + ((isUsed || !canUse) ? ' disabled style="background:var(--toss-grey-300);color:var(--toss-grey-500);cursor:not-allowed;"' : '') + '>신청</button>' +
                             '</div>';
                     }).join('')}
                 </div>
