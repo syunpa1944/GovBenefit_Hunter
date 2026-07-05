@@ -39,7 +39,7 @@ async function run() {
     // }
     
     const config = {
-      artifactPath: path.resolve('test-app/govbenefit-hunter.ait'),
+      artifactPath: path.resolve('govbenefit-hunter.ait'),
       appName: 'govbenefit-hunter',
       deploymentId: '019f2b97-2926-7f8a-959e-33e9da5f561f',
       apiKey: '5xZHDDQGkiFkDUG8_VR4DpiIiSEmsGKK8vlKIqPUH4U',

@@ -380,8 +380,9 @@ async function loadBenefitsData() {
         updateDashboard();
     };
 
-    // 3단계: 준비된 스크립트 엘리먼트를 실제 DOM에 삽입하여 비동기 다운로드 및 적재를 기동합니다.
-    document.head.appendChild(script);
+        // 3단계: 준비된 스크립트 엘리먼트를 실제 DOM에 삽입하여 비동기 다운로드 및 적재를 기동합니다.
+        document.head.appendChild(script);
+    }
 }
 
 function updateDashboard() {
