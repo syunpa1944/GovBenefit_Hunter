@@ -1069,7 +1069,15 @@ function openSheet(dateStr, items) {
 
     list.innerHTML = cardListArray.join('');
 
-    if (ADS_ENABLED) attachTossBanner(adContainerId);
+    if (ADS_ENABLED) {
+        attachTossBanner(adContainerId);
+        if (!rewardedThisSession) {
+            setTimeout(() => {
+                tryShowRewardedAd();
+                rewardedThisSession = true;
+            }, 500);
+        }
+    }
 
     document.getElementById('bottomSheet').classList.add('open');
     document.getElementById('overlay').classList.add('visible');
@@ -1262,6 +1270,7 @@ function attachTossBanner(containerId) {
 
 // 리워드 광고(Rewarded) 상태 관리
 let rewardedAdLoaded = false;
+let rewardedThisSession = false;
 const REWARDED_AD_ID = 'ait.v2.live.be0a965d07e0432b'; // 실제 상용 출시용 리워드 광고 ID
 
 function preloadRewardedAd() {
@@ -1433,17 +1442,13 @@ window.onload = () => {
             preloadRewardedAd();
         }
 
-        // 토스 뒤로가기 버튼 클릭 가로채기 ➡️ 리워드 광고 유도 후 앱 종료
+        // 토스 뒤로가기 버튼 클릭 가로채기 ➡️ 종료 확인 모달 즉시 노출
         if (typeof graniteEvent !== 'undefined') {
             try {
                 graniteEvent.addEventListener('backEvent', {
                     onEvent: () => {
-                        console.log('Toss Back Key Pressed. Triggering exit reward ad...');
-                        const adStarted = tryShowRewardedAd();
-                        // 광고가 아직 로드되지 않았거나 송출할 수 없는 경우에도 바로 끄지 않고 종료 확인 모달 노출
-                        if (!adStarted) {
-                            showExitConfirmModal();
-                        }
+                        console.log('Toss Back Key Pressed. Showing exit confirm modal...');
+                        showExitConfirmModal();
                     }
                 });
             } catch (e) {
@@ -1460,8 +1465,6 @@ window.onload = () => {
 
 window.onbeforeunload = () => {
     if (ADS_ENABLED) {
-        tryShowRewardedAd();
-
         if (activeTossAdBanner) {
             activeTossAdBanner.destroy();
             activeTossAdBanner = null;

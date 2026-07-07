@@ -1022,7 +1022,15 @@ function openSheet(dateStr, items) {
 
     list.innerHTML = cardListArray.join('');
 
-    if (ADS_ENABLED) attachTossBanner(adContainerId);
+    if (ADS_ENABLED) {
+        attachTossBanner(adContainerId);
+        if (!rewardedThisSession) {
+            setTimeout(() => {
+                tryShowRewardedAd();
+                rewardedThisSession = true;
+            }, 500);
+        }
+    }
 
     document.getElementById('bottomSheet').classList.add('open');
     document.getElementById('overlay').classList.add('visible');
@@ -1170,6 +1178,7 @@ function attachTossBanner(containerId) {
 
 // 리워드 광고(Rewarded) 상태 관리
 let rewardedAdLoaded = false;
+let rewardedThisSession = false;
 const REWARDED_AD_ID = 'ait.v2.live.be0a965d07e0432b'; // 실제 상용 출시용 리워드 광고 ID
 
 function preloadRewardedAd() {
@@ -1263,8 +1272,6 @@ window.onload = () => {
 
 window.onbeforeunload = () => {
     if (ADS_ENABLED) {
-        tryShowRewardedAd();
-
         if (activeTossAdBanner) {
             activeTossAdBanner.destroy();
             activeTossAdBanner = null;
