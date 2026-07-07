@@ -389,7 +389,9 @@ def build_data():
                 # 2단계: 동일 날짜 내 동일 제목 중복 등록 방지
                 if any(existing["title"] == ev["title"] for existing in data[date_key]):
                     continue
-                ac, an, sc, sn = get_area_from_address(ev["place"] or ev["area"])
+                # place가 '전국'(기본값)이면 API 검색에 사용한 area로 보정
+                place_for_area = ev["place"] if ev["place"] and ev["place"] != "전국" else ev["area"]
+                ac, an, sc, sn = get_area_from_address(place_for_area)
                 
                 realm = ev["realmName"]
                 # 분야별 매핑
