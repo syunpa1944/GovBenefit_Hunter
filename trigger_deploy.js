@@ -41,9 +41,9 @@ async function run() {
     const config = {
       artifactPath: path.resolve('govbenefit-hunter.ait'),
       appName: 'govbenefit-hunter',
-      deploymentId: '019f2b97-2926-7f8a-959e-33e9da5f561f',
+      deploymentId: '019f3c5e-8ff8-769a-bb09-b4a7d8ab726a',
       apiKey: '5xZHDDQGkiFkDUG8_VR4DpiIiSEmsGKK8vlKIqPUH4U',
-      memo: '정부혜택달력 상용 출시 최종 이탈방지 리워드 광고 후킹 및 자동 닫기 연동 버전',
+      memo: '외부 CDN 스크립트(static.toss.im, jsdelivr) 제거 → Vite 모듈 임포트로 대체',
       baseUrl: 'https://apps-in-toss.toss.im/console',
       timeoutSeconds: 300
     };

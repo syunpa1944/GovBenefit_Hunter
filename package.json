@@ -1,11 +1,12 @@
 {
   "name": "govbenefit-hunter",
-  "version": "20260705-01",
-  "description": "정부혜택털기 - 여행/복지 스마트 캘린더 미니앱 최초 버전",
+  "version": "20260707-53",
+  "description": "정부혜택털기 - 여행/복지 스마트 캘린더 미니앱 (가로슬라이딩 필터+자격9종+문화행사 카테고리 분류)",
   "main": "app.js",
   "scripts": {
     "build": "echo 'No build step required for static assets'"
   },
+  "dependencies": {},
   "devDependencies": {
     "@apps-in-toss/cli": "^2.10.1",
     "@apps-in-toss/web-framework": "^2.10.1",

@@ -38,12 +38,15 @@ jobs:
       run: |
         # 공공 API 보안키를 환경변수로 주입받아 실시간 문화/정부혜택 데이터 수집 및 병합
         python inject_data.py
+        # .ait 빌드용 test-app/public/에도 동일 데이터 복사
+        cp data.js test-app/public/data.js
+        cp data.json test-app/public/data.json
 
     - name: Commit and Push Updated Data
       run: |
         git config --global user.name "github-actions[bot]"
         git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
-        git add data.js data.json
+        git add data.js data.json test-app/public/data.js test-app/public/data.json
         # 변경사항이 있는 경우에만 안전 커밋 및 푸시 가동
         git diff --quiet && git diff --staged --quiet || (git commit -m "chore: 공공데이터 일간 캘린더 데이터 자동 갱신 [skip ci]" && git push)
 

@@ -741,7 +741,9 @@ function render() {
             const emojiMap = {
                 "festival": "🎉", "water": "🌊", "free": "🎫",
                 "benefit": "💸", "payback": "💵", "eco": "🌿",
-                "barrier": "♿", "pet": "🐶", "camp": "🏕️", "stroller": "🧒"
+                "barrier": "♿", "pet": "🐶", "camp": "🏕️", "stroller": "🧒",
+                "culture": "🎭", "exhibition": "🖼️", "theater": "🎭",
+                "education": "📚", "family": "👪"
             };
             const uniqueEmojis = new Set();
             filtered.forEach(item => {
@@ -812,7 +814,12 @@ const ELIGIBILITY_OPTIONS = [
     { key: 'company_vacation', label: '기업휴가지원 등록', emoji: '🏢' },
     { key: 'low_income', label: '저소득층', emoji: '🪪' },
     { key: 'multi_child', label: '다자녀', emoji: '👨‍👩‍👧‍👦' },
-    { key: 'disabled', label: '장애인', emoji: '♿' }
+    { key: 'disabled', label: '장애인', emoji: '♿' },
+    { key: 'national_merit', label: '국가유공자', emoji: '🎖️' },
+    { key: 'senior', label: '경로/어르신', emoji: '👴' },
+    { key: 'youth', label: '청년', emoji: '🧑' },
+    { key: 'single_parent', label: '한부모가족', emoji: '👩‍👧' },
+    { key: 'pregnant', label: '임산부', emoji: '🤰' }
 ];
 
 function toggleEligibility(type) {

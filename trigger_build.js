@@ -1,8 +1,8 @@
 const path = require('path');
 const fs = require('fs');
 
-// 작업 디렉토리를 test-app으로 변경하여 granite 설정 파일을 무사히 찾도록 조치
-process.chdir(path.resolve(__dirname, 'test-app'));
+// 작업 디렉토리를 루트로 변경하여 granite 설정 파일을 찾도록 조치
+process.chdir(path.resolve(__dirname));
 
 // We will read CLI index.js, wrap it to expose buildArtifact, and execute it.
 const cliPath = path.resolve('node_modules/@apps-in-toss/cli/dist/index.js');
@@ -42,7 +42,7 @@ async function run() {
     }
     
     console.log('Executing official buildArtifact pipeline (Web strategy only)...');
-    const result = await global.buildArtifact('C:\\럭포마_개발자료\\앱인토스\\광고예상\\test-app');
+    const result = await global.buildArtifact('C:\\럭포마_개발자료\\앱인토스\\광고예상');
     console.log('Build Artifact Result:', result);
   } catch (err) {
     console.error('Execution Error:', err);

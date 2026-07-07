@@ -50,6 +50,36 @@ global_benefits = [
         "desc": "공식 축제·행사는 복지카드 제시 시 입장료 면제 또는 50% 감면",
         "link": "https://search.naver.com/search.naver?query=" + urllib.parse.quote("장애인 복지카드 혜택"),
         "eligible": "disabled"
+    },
+    {
+        "name": "국가유공자 무료/할인 입장",
+        "desc": "국가유공자증 제시 시 국립 시설·행사 입장료 면제 또는 할인",
+        "link": "https://www.mpva.go.kr/",
+        "eligible": "national_merit"
+    },
+    {
+        "name": "경로 무료/할인 입장",
+        "desc": "만 65세 이상 어르신 각종 공연·축제·시설 입장료 할인 또는 면제",
+        "link": "https://search.naver.com/search.naver?query=" + urllib.parse.quote("경로 우대 혜택"),
+        "eligible": "senior"
+    },
+    {
+        "name": "청년 문화 지원 할인",
+        "desc": "청년(만 19~39세) 대상 공연·전시·축제 입장료 할인 및 지원금",
+        "link": "https://www.youth.go.kr/",
+        "eligible": "youth"
+    },
+    {
+        "name": "한부모가족 지원 할인",
+        "desc": "한부모가족 증명서 제시 시 문화·여가 시설 이용료 감면",
+        "link": "https://www.bokjiro.go.kr/",
+        "eligible": "single_parent"
+    },
+    {
+        "name": "임산부 배려 혜택",
+        "desc": "임산부 우대·배려석 이용 및 임신 확인 시 일부 시설 무료 입장",
+        "link": "https://search.naver.com/search.naver?query=" + urllib.parse.quote("임산부 배려 혜택"),
+        "eligible": "pregnant"
     }
 ]
 

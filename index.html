@@ -91,15 +91,20 @@
         .reward-display { font-size: 14px; font-weight: 600; color: #e74c3c; white-space: nowrap; }
         
         .filter-container { 
-            display: grid; 
-            grid-template-columns: repeat(3, 1fr); 
+            display: flex; 
             gap: 8px; 
             padding-bottom: 4px; 
+            overflow-x: auto;
+            flex-wrap: nowrap;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+            padding-bottom: 8px;
         }
+        .filter-container::-webkit-scrollbar { display: none; }
         
         .filter-chip {
-            justify-content: center;
-            white-space: nowrap; padding: 10px 4px; border-radius: 12px;
+            flex-shrink: 0;
+            white-space: nowrap; padding: 10px 12px; border-radius: 12px;
             background: var(--toss-grey-100); font-size: 13px; font-weight: 600;
             color: var(--toss-grey-600); cursor: pointer; border: 1.2px solid transparent;
             transition: all 0.2s; display: flex; align-items: center; gap: 4px;
@@ -107,10 +112,8 @@
         .filter-chip.active { background: var(--toss-blue-light); color: var(--toss-blue); border-color: var(--toss-blue); }
         .filter-chip.all-active { background: var(--toss-blue); color: var(--toss-white); }
         
-        /* 1번째 칩(전체보기)이 첫 줄을 크게 차지하거나 전체적으로 균등하게 3열 정렬되도록 구성 */
         #filter-all {
-            grid-column: span 3;
-            padding: 12px 14px;
+            padding: 10px 12px;
         }
         
         /* 범례 설명 */
@@ -255,12 +258,8 @@
         .card-btn { height: clamp(42px, 11vw, 50px); font-size: clamp(12px, 3.2vw, 14px); }
         .area-select { font-size: clamp(11px, 3vw, 14px); }
     </style>
-    <!-- Toss Pixel SDK (async/defer 금지, SDK가 head에 먼저 로드되어야 함) -->
-    <script src="https://static.toss.im/lex/v1.js"></script>
-    <!-- Toss Ads SDK (광고 렌더링에 필수적인 Space Kit 로드) -->
-    <script src="https://static.toss.im/ads/v1.js"></script>
-    <!-- Apps-in-Toss Web Framework SDK v2 번들 로딩 -->
-    <script src="https://cdn.jsdelivr.net/npm/@apps-in-toss/web-framework@2.10.1/dist-web/index.min.js"></script>
+    <!-- 외부 SDK 스크립트 제거: Toss 미니앱 WebView 환경에서만 정상 동작하며, Vite 빌드(src/main.js)의 모듈 임포트로 대체됨 -->
+
 </head>
 <body>
     <div id="app">
@@ -307,13 +306,24 @@
                 <button id="filter-barrier" class="filter-chip category" data-filter="barrier">♿ 무장애여행</button>
                 <button id="filter-pet" class="filter-chip category" data-filter="pet">🐶 반려동물동반</button>
                 <button id="filter-camp" class="filter-chip category" data-filter="camp">🏕️ 고캠핑/야영</button>
+                <button id="filter-culture" class="filter-chip category" data-filter="culture">🎭 문화생활</button>
+                <button id="filter-exhibition" class="filter-chip category" data-filter="exhibition">🖼️ 전시/관람</button>
+                <button id="filter-theater" class="filter-chip category" data-filter="theater">🎭 공연/연극</button>
+                <button id="filter-education" class="filter-chip category" data-filter="education">📚 교육/체험</button>
+                <button id="filter-family" class="filter-chip category" data-filter="family">👪 가족/아동</button>
+                <button id="filter-stroller" class="filter-chip category" data-filter="stroller">🧒 유모차/영유아</button>
             </div>
-            <div class="eligibility-container" id="eligibilityContainer" style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px;">
-                <span style="font-size:11px;color:var(--toss-grey-600);align-self:center;margin-right:2px;">내 자격:</span>
+            <div class="eligibility-container" id="eligibilityContainer" style="margin-top:10px;display:flex;overflow-x:auto;flex-wrap:nowrap;gap:6px;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:4px;">
+                <span style="font-size:11px;color:var(--toss-grey-600);align-self:center;margin-right:2px;flex-shrink:0;">내 자격:</span>
                 <button class="filter-chip eligibility-chip" id="eligibility-company_vacation" data-eligibility="company_vacation">🏢 기업휴가지원</button>
                 <button class="filter-chip eligibility-chip" id="eligibility-low_income" data-eligibility="low_income">🪪 저소득층</button>
                 <button class="filter-chip eligibility-chip" id="eligibility-multi_child" data-eligibility="multi_child">👨‍👩‍👧‍👦 다자녀</button>
                 <button class="filter-chip eligibility-chip" id="eligibility-disabled" data-eligibility="disabled">♿ 장애인</button>
+                <button class="filter-chip eligibility-chip" id="eligibility-national_merit" data-eligibility="national_merit">🎖️ 국가유공자</button>
+                <button class="filter-chip eligibility-chip" id="eligibility-senior" data-eligibility="senior">👴 경로/어르신</button>
+                <button class="filter-chip eligibility-chip" id="eligibility-youth" data-eligibility="youth">🧑 청년</button>
+                <button class="filter-chip eligibility-chip" id="eligibility-single_parent" data-eligibility="single_parent">👩‍👧 한부모가족</button>
+                <button class="filter-chip eligibility-chip" id="eligibility-pregnant" data-eligibility="pregnant">🤰 임산부</button>
             </div>
         </div>
 

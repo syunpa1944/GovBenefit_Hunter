@@ -1,11 +1,11 @@
-// 오늘 날짜 고정 (가이드 및 명세 준수)
-const FIXED_TODAY = new Date(2026, 5, 25); // 2026년 6월 25일
+// 오늘 날짜 동적 연동 (정식 상용 출시 반영)
+const FIXED_TODAY = new Date();
 const ADS_ENABLED = true; // 광고 모듈 ON/OFF (true로 변경 시 활성화)
 const REWARD_KEY = 'rewardPoints';
 let currentYear = FIXED_TODAY.getFullYear();
 let currentMonth = FIXED_TODAY.getMonth();
 
-const todayStr = "2026-06-25";
+const todayStr = `${FIXED_TODAY.getFullYear()}-${String(FIXED_TODAY.getMonth() + 1).padStart(2, '0')}-${String(FIXED_TODAY.getDate()).padStart(2, '0')}`;
 let benefitsData = {};
 let barrierData = [];  // 무장애 시설 (필터 시 전국 상시 노출)
 let petData = [];      // 반려동물 동반 시설 (필터 시 전국 상시 노출)
@@ -36,7 +36,7 @@ function toggleBenefitUsed(name) {
         const cb = row.querySelector('input[type="checkbox"]');
         const nameEl = row.querySelector('.linked-benefit-name');
         if (!cb || !nameEl) return;
-        const benefitName = nameEl.textContent.replace('💸', '').trim();
+        const benefitName = String(nameEl.textContent || '').replace('💸', '').trim();
         const isUsed = usedBenefits.includes(benefitName);
         cb.checked = isUsed;
         row.style.opacity = isUsed ? '0.6' : '';
@@ -371,7 +371,7 @@ function updateDashboard() {
                 if (item.benefits && item.benefits.length > 0) {
                     item.benefits.forEach(b => {
                         if (b.eligible && !userEligibility.includes(b.eligible)) return;
-                        const targetText = (b.name + " " + b.desc).replace(/,/g, '');
+                        const targetText = (String(b.name || '') + " " + String(b.desc || '')).replace(/,/g, '');
                         let parsedVal = 0;
 
                         // "20만원", "13만원" 등의 만원 패턴 매칭
@@ -403,7 +403,7 @@ function updateDashboard() {
                     });
                 } else if (item.amount) {
                     // 2단계: benefits가 없는 단독 혜택인 경우, 행사 타이틀 기준으로 중복을 체크해 합산
-                    const cleanAmountStr = item.amount.replace(/%/g, 'percent').replace(/,/g, '');
+                    const cleanAmountStr = String(item.amount || '').replace(/%/g, 'percent').replace(/,/g, '');
                     let parsedVal = 0;
 
                     const manwonMatch = cleanAmountStr.match(/(\d+)\s*만/);
@@ -741,7 +741,9 @@ function render() {
             const emojiMap = {
                 "festival": "🎉", "water": "🌊", "free": "🎫",
                 "benefit": "💸", "payback": "💵", "eco": "🌿",
-                "barrier": "♿", "pet": "🐶", "camp": "🏕️", "stroller": "🧒"
+                "barrier": "♿", "pet": "🐶", "camp": "🏕️", "stroller": "🧒",
+                "culture": "🎭", "exhibition": "🖼️", "theater": "🎭",
+                "education": "📚", "family": "👪"
             };
             const uniqueEmojis = new Set();
             filtered.forEach(item => {
@@ -812,7 +814,12 @@ const ELIGIBILITY_OPTIONS = [
     { key: 'company_vacation', label: '기업휴가지원 등록', emoji: '🏢' },
     { key: 'low_income', label: '저소득층', emoji: '🪪' },
     { key: 'multi_child', label: '다자녀', emoji: '👨‍👩‍👧‍👦' },
-    { key: 'disabled', label: '장애인', emoji: '♿' }
+    { key: 'disabled', label: '장애인', emoji: '♿' },
+    { key: 'national_merit', label: '국가유공자', emoji: '🎖️' },
+    { key: 'senior', label: '경로/어르신', emoji: '👴' },
+    { key: 'youth', label: '청년', emoji: '🧑' },
+    { key: 'single_parent', label: '한부모가족', emoji: '👩‍👧' },
+    { key: 'pregnant', label: '임산부', emoji: '🤰' }
 ];
 
 function toggleEligibility(type) {
@@ -957,13 +964,13 @@ function openSheet(dateStr, items) {
                         const nameStyle = isUsed ? 'text-decoration:line-through;color:var(--toss-grey-600);' : (!canUse ? 'color:var(--toss-grey-500);' : '');
                         const lockBadge = !canUse && !isUsed ? '<span style="font-size:9px;color:var(--toss-grey-500);margin-left:4px;">🔒 자격선택 필요</span>' : '';
                         return '<div class="linked-benefit-row"' + (rowStyle ? ' style="' + rowStyle + '"' : '') + '>' +
-                            '<input type="checkbox" class="benefit-checkbox" data-benefit-name="' + b.name.replace(/"/g,'&quot;') + '"' + (isUsed ? ' checked' : '') +
+                            '<input type="checkbox" class="benefit-checkbox" data-benefit-name="' + String(b.name || '').replace(/"/g,'&quot;') + '"' + (isUsed ? ' checked' : '') +
                             ' style="width:16px;height:16px;cursor:pointer;accent-color:var(--toss-blue);flex-shrink:0;margin-right:8px;"' + (!canUse && !isUsed ? ' disabled' : '') + ' />' +
                             '<div class="linked-benefit-info" style="flex:1;">' +
                             '<div class="linked-benefit-name"' + (nameStyle ? ' style="' + nameStyle + '"' : '') + '>💸 ' + b.name + lockBadge + '</div>' +
                             '<div class="linked-benefit-desc">' + b.desc + '</div>' +
                             '</div>' +
-                            '<button class="linked-benefit-btn open-url-btn" data-url="' + b.link.replace(/"/g,'&quot;') + '"' + ((isUsed || !canUse) ? ' disabled style="background:var(--toss-grey-300);color:var(--toss-grey-500);cursor:not-allowed;"' : '') + '>신청</button>' +
+                            '<button class="linked-benefit-btn open-url-btn" data-url="' + String(b.link || '').replace(/"/g,'&quot;') + '"' + ((isUsed || !canUse) ? ' disabled style="background:var(--toss-grey-300);color:var(--toss-grey-500);cursor:not-allowed;"' : '') + '>신청</button>' +
                             '</div>';
                     }).join('')}
                 </div>
@@ -973,7 +980,7 @@ function openSheet(dateStr, items) {
         // 행사 신청 버튼 딱 1개만 정의 (중복 다중 버튼 제거)
         let applyBtnsHtml = '';
         if (mainLink) {
-            applyBtnsHtml = `<button class="card-btn open-url-btn" data-url="${mainLink.replace(/"/g,'&quot;')}" style="width:80%;max-width:360px;">행사 신청</button>`;
+            applyBtnsHtml = `<button class="card-btn open-url-btn" data-url="${String(mainLink || '').replace(/"/g,'&quot;')}" style="width:80%;max-width:360px;">행사 신청</button>`;
         }
 
         const detailHtml = `
