@@ -1,6 +1,8 @@
+const isInTossApp = typeof window.TossAds !== 'undefined' || typeof window.AppsInToss !== 'undefined' || typeof window.ReactNativeWebView !== 'undefined';
+
 // 오늘 날짜 동적 연동 (정식 상용 출시 반영)
 const FIXED_TODAY = new Date();
-const ADS_ENABLED = true; // 광고 모듈 ON/OFF (true로 변경 시 활성화)
+const ADS_ENABLED = isInTossApp; // 토스 앱 내부에서만 광고 활성화
 const REWARD_KEY = 'rewardPoints';
 let currentYear = FIXED_TODAY.getFullYear();
 let currentMonth = FIXED_TODAY.getMonth();
@@ -1155,6 +1157,18 @@ function attachTossBanner(containerId) {
     }
     const container = document.getElementById(containerId || 'tossAdBanner');
     if (!container) return;
+
+    if (!isInTossApp) {
+        const banner = document.createElement('div');
+        banner.style.cssText = 'width:100%;min-height:80px;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#0064FF,#00C6FB);border-radius:12px;padding:12px;cursor:pointer;margin-bottom:12px;';
+        banner.innerHTML = '<div style="text-align:center;color:#fff;"><div style="font-size:14px;font-weight:700;margin-bottom:4px;">📱 토스 앱에서 더 많은 혜택을!</div><div style="font-size:11px;opacity:0.9;">지금 토스 앱에서 정부혜택달력을 열어보세요</div></div>';
+        banner.onclick = () => {
+            try { window.location.href = 'intoss-private://govbenefit-hunter'; } catch(e) {}
+        };
+        container.appendChild(banner);
+        return;
+    }
+
     if (typeof TossAds === 'undefined' || !TossAds.attachBanner || !TossAds.attachBanner.isSupported()) return;
     try {
         activeTossAdBanner = TossAds.attachBanner(

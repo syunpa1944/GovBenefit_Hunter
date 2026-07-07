@@ -3,9 +3,11 @@ if (typeof TossAds === 'undefined' && window.AppsInToss) {
     window.TossAds = window.AppsInToss.TossAds;
 }
 
+const isInTossApp = typeof window.TossAds !== 'undefined' || typeof window.AppsInToss !== 'undefined' || typeof window.ReactNativeWebView !== 'undefined';
+
 // 오늘 날짜 동적 연동 (정식 상용 출시 반영)
 const FIXED_TODAY = new Date();
-const ADS_ENABLED = true; // 광고 모듈 ON/OFF (true로 변경 시 활성화)
+const ADS_ENABLED = isInTossApp; // 토스 앱 내부에서만 광고 활성화
 const REWARD_KEY = 'rewardPoints';
 let currentYear = FIXED_TODAY.getFullYear();
 let currentMonth = FIXED_TODAY.getMonth();
@@ -1202,43 +1204,19 @@ function attachTossBanner(containerId) {
     }
     const container = document.getElementById(containerId || 'tossAdBanner');
     if (!container) return;
-    
-    // 실시간 모바일 광고 SDK 연결 상태 진단 디버그 텍스트 생성
-    let debugInfo = `TossAds 객체: ${typeof TossAds}`;
-    if (typeof TossAds !== 'undefined') {
-        debugInfo += `, attachBanner: ${typeof TossAds.attachBanner}`;
-        if (TossAds.attachBanner) {
-            try { debugInfo += `, 지원여부(isSupported): ${TossAds.attachBanner.isSupported()}`; } catch(e) { debugInfo += `, 에러: ${e.message}`; }
-        }
-    }
-    const dbgEl = document.createElement('div');
-    dbgEl.style.cssText = 'font-size:9px;color:#8B95A1;text-align:center;padding:4px 0 2px;width:100%;';
-    dbgEl.innerText = `[광고 상태 디버그] ${debugInfo}`;
-    container.appendChild(dbgEl);
 
-    // 전역 객체 수색 및 시각적 표출 (non-enumerable 다이렉트 투시)
-    let directCheck = `window.Toss: ${typeof window.Toss}`;
-    if (typeof window.Toss !== 'undefined') {
-        const tKeys = Object.keys(window.Toss) || [];
-        directCheck += ` (keys: [${tKeys.join(', ')}])`;
-        directCheck += `, openExternal: ${typeof window.Toss.openExternal}`;
-        directCheck += `, attachBanner: ${typeof window.Toss.attachBanner}`;
-        directCheck += `, loadRewardedAd: ${typeof window.Toss.loadRewardedAd}`;
-        directCheck += `, showRewardedAd: ${typeof window.Toss.showRewardedAd}`;
-    }
-    directCheck += ` | window.TossAds: ${typeof window.TossAds}`;
-    if (typeof window.TossAds !== 'undefined') {
-        directCheck += `, attachBanner: ${typeof window.TossAds.attachBanner}`;
-    }
-    const dbgEl2 = document.createElement('div');
-    dbgEl2.style.cssText = 'font-size:9px;color:#0064FF;text-align:center;padding:2px 0 6px;width:100%;word-break:break-all;';
-    dbgEl2.innerText = `🔍 [브릿지 분석] ${directCheck}`;
-    container.appendChild(dbgEl2);
-
-    if (typeof TossAds === 'undefined' || !TossAds.attachBanner || !TossAds.attachBanner.isSupported()) {
-        dbgEl.innerText += " ➡️ 토스 광고 SDK 미지원 상태";
+    if (!isInTossApp) {
+        const banner = document.createElement('div');
+        banner.style.cssText = 'width:100%;min-height:80px;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#0064FF,#00C6FB);border-radius:12px;padding:12px;cursor:pointer;margin-bottom:12px;';
+        banner.innerHTML = '<div style="text-align:center;color:#fff;"><div style="font-size:14px;font-weight:700;margin-bottom:4px;">📱 토스 앱에서 더 많은 혜택을!</div><div style="font-size:11px;opacity:0.9;">지금 토스 앱에서 정부혜택달력을 열어보세요</div></div>';
+        banner.onclick = () => {
+            try { window.location.href = 'intoss-private://govbenefit-hunter'; } catch(e) {}
+        };
+        container.appendChild(banner);
         return;
     }
+
+    if (typeof TossAds === 'undefined' || !TossAds.attachBanner || !TossAds.attachBanner.isSupported()) return;
     try {
         activeTossAdBanner = TossAds.attachBanner(
             'ait.v2.live.c5633be2471a4b9c',
@@ -1248,18 +1226,9 @@ function attachTossBanner(containerId) {
                 tone: 'blackAndWhite',
                 variant: 'expanded',
                 callbacks: {
-                    onAdRendered: (p) => {
-                        console.log('TossAd rendered:', p.slotId);
-                        dbgEl.innerText = `🟢 광고 로딩 성공`;
-                    },
-                    onAdFailedToRender: (p) => {
-                        console.warn('TossAd failed:', p.error?.message);
-                        dbgEl.innerText = `🔴 광고 렌더링 실패: ${p.error?.message || '이유 미기재'}`;
-                    },
-                    onNoFill: (p) => {
-                        console.warn('TossAd no fill');
-                        dbgEl.innerText = `🟡 광고 없음(No Fill): 물량 부족 또는 계약 미승인`;
-                    }
+                    onAdRendered: (p) => console.log('TossAd rendered:', p.slotId),
+                    onAdFailedToRender: (p) => console.warn('TossAd failed:', p.error?.message),
+                    onNoFill: (p) => console.warn('TossAd no fill')
                 }
             }
         );
