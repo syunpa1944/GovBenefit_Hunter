@@ -1,4 +1,7 @@
-const isInTossApp = typeof window.TossAds !== 'undefined' || typeof window.AppsInToss !== 'undefined' || typeof window.ReactNativeWebView !== 'undefined';
+﻿// 로드된 2.x 프레임워크 번들로부터 TossAds 전역 바인딩 확보
+if (typeof TossAds === 'undefined' && window.AppsInToss) {
+    window.TossAds = window.AppsInToss.TossAds;
+}
 
 // 오늘 날짜 동적 연동 (정식 상용 출시 반영)
 const FIXED_TODAY = new Date();
@@ -38,7 +41,7 @@ function toggleBenefitUsed(name) {
         const cb = row.querySelector('input[type="checkbox"]');
         const nameEl = row.querySelector('.linked-benefit-name');
         if (!cb || !nameEl) return;
-        const benefitName = String(nameEl.textContent || '').replace('💸', '').trim();
+        const benefitName = nameEl.textContent.replace('💸', '').trim();
         const isUsed = usedBenefits.includes(benefitName);
         cb.checked = isUsed;
         row.style.opacity = isUsed ? '0.6' : '';
@@ -133,32 +136,65 @@ async function loadBenefitsData() {
     render();
     updateDashboard();
 
-    // 2단계: 대용량 공공데이터(data.js)를 백그라운드 비동기로 로드합니다.
-    const script = document.createElement('script');
-    script.src = 'data.js';
-    script.async = true;
-
-    script.onload = () => {
-        console.log("공공데이터 실데이터 패키지 비동기 적재 성공.");
-        if (window.BENEFITS_DATA && Object.keys(window.BENEFITS_DATA).length > 0) {
-            const raw = window.BENEFITS_DATA;
-            // 무장애 및 반려동물 메타데이터 분리 탑재
-            barrierData = raw["__barrier__"] || [];
-            petData = raw["__pet__"] || [];
-            // 순수 날짜 데이터만 할당
-            benefitsData = Object.fromEntries(
-                Object.entries(raw).filter(([k]) => !k.startsWith('__'))
-            );
+    // 2단계: 최신 실시간 서버 데이터 동기화 (런타임 fetch 기동!)
+    let remoteLoaded = false;
+    const REMOTE_DATA_URL = 'https://raw.githubusercontent.com/syunpa1944/GovBenefit_Hunter/main/data.json';
+    
+    try {
+        console.log("실시간 서버 원격 데이터 동기화 요청 중...");
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 4000); // 4초 타임아웃으로 모바일 지연 차단
+        
+        const res = await fetch(REMOTE_DATA_URL, { signal: controller.signal });
+        clearTimeout(timeoutId);
+        
+        if (res.ok) {
+            const raw = await res.json();
+            if (raw && Object.keys(raw).length > 0) {
+                console.log("성공: 원격 서버로부터 실시간 최신 데이터를 100% 동기화 적재했습니다!");
+                barrierData = raw["__barrier__"] || [];
+                petData = raw["__pet__"] || [];
+                benefitsData = Object.fromEntries(
+                    Object.entries(raw).filter(([k]) => !k.startsWith('__'))
+                );
+                // 혜택 풀 데이터 저장
+                window.BENEFITS_DATA = raw;
+                
+                preprocessDataByAddress();
+                render();
+                updateDashboard();
+                remoteLoaded = true;
+            }
         }
-        preprocessDataByAddress(); // 주소 기반 행정구역 분류 정합성 보정 기동!
-        render();
-        updateDashboard();
-    };
+    } catch (e) {
+        console.warn("원격 실시간 서버 동기화 실패 (오프라인 또는 타임아웃). 로컬 번들 적재로 우회합니다.", e);
+    }
 
-    script.onerror = (err) => {
-        console.warn("data.js 비동기 로딩 실패. 백업 데이터를 대체 탑재합니다.", err);
-        // 로컬 실행(더블 클릭) 대비 완벽한 백업 데이터 주입
-        benefitsData = {
+    // 3단계: 원격 데이터 획득 실패 시 Fallback 로컬 data.js 비동기 로드
+    if (!remoteLoaded) {
+        const script = document.createElement('script');
+        script.src = 'data.js';
+        script.async = true;
+
+        script.onload = () => {
+            console.log("공공데이터 로컬 패키지 비동기 적재 성공.");
+            if (window.BENEFITS_DATA && Object.keys(window.BENEFITS_DATA).length > 0) {
+                const raw = window.BENEFITS_DATA;
+                barrierData = raw["__barrier__"] || [];
+                petData = raw["__pet__"] || [];
+                benefitsData = Object.fromEntries(
+                    Object.entries(raw).filter(([k]) => !k.startsWith('__'))
+                );
+            }
+            preprocessDataByAddress();
+            render();
+            updateDashboard();
+        };
+
+        script.onerror = (err) => {
+            console.warn("data.js 비동기 로딩 실패. 백업 데이터를 대체 탑재합니다.", err);
+            // 로컬 실행(더블 클릭) 대비 완벽한 백업 데이터 주입
+            benefitsData = {
             "2026-06-25": [
             {
               "id": 2000,
@@ -344,8 +380,9 @@ async function loadBenefitsData() {
         updateDashboard();
     };
 
-    // 3단계: 준비된 스크립트 엘리먼트를 실제 DOM에 삽입하여 비동기 다운로드 및 적재를 기동합니다.
-    document.head.appendChild(script);
+        // 3단계: 준비된 스크립트 엘리먼트를 실제 DOM에 삽입하여 비동기 다운로드 및 적재를 기동합니다.
+        document.head.appendChild(script);
+    }
 }
 
 function updateDashboard() {
@@ -373,7 +410,7 @@ function updateDashboard() {
                 if (item.benefits && item.benefits.length > 0) {
                     item.benefits.forEach(b => {
                         if (b.eligible && !userEligibility.includes(b.eligible)) return;
-                        const targetText = (String(b.name || '') + " " + String(b.desc || '')).replace(/,/g, '');
+                        const targetText = (b.name + " " + b.desc).replace(/,/g, '');
                         let parsedVal = 0;
 
                         // "20만원", "13만원" 등의 만원 패턴 매칭
@@ -405,7 +442,7 @@ function updateDashboard() {
                     });
                 } else if (item.amount) {
                     // 2단계: benefits가 없는 단독 혜택인 경우, 행사 타이틀 기준으로 중복을 체크해 합산
-                    const cleanAmountStr = String(item.amount || '').replace(/%/g, 'percent').replace(/,/g, '');
+                    const cleanAmountStr = item.amount.replace(/%/g, 'percent').replace(/,/g, '');
                     let parsedVal = 0;
 
                     const manwonMatch = cleanAmountStr.match(/(\d+)\s*만/);
@@ -969,19 +1006,26 @@ function openSheet(dateStr, items) {
                 <div class="benefits-section">
                     <div class="benefits-section-title">🎟️ 이 행사에서 쓸 수 있는 혜택</div>
                     ${item.benefits.map(function(b) {
-                        const isUsed = usedBenefits.includes(b.name);
-                        const canUse = !b.eligible || userEligibility.includes(b.eligible);
+                        // 혜택 정규화 복원 (BOM 다이어트 최적화 해제)
+                        let targetBenefit = b;
+                        if (typeof b === 'string') {
+                            const pool = (window.BENEFITS_DATA && window.BENEFITS_DATA.__benefits_pool__) || [];
+                            targetBenefit = pool.find(x => x.name === b) || { name: b, desc: '상세 정보는 안내 페이지 참조', link: mainLink };
+                        }
+                        
+                        const isUsed = usedBenefits.includes(targetBenefit.name);
+                        const canUse = !targetBenefit.eligible || userEligibility.includes(targetBenefit.eligible);
                         const rowStyle = isUsed ? 'opacity:0.6;background:var(--toss-grey-100);' : (!canUse ? 'opacity:0.45;' : '');
                         const nameStyle = isUsed ? 'text-decoration:line-through;color:var(--toss-grey-600);' : (!canUse ? 'color:var(--toss-grey-500);' : '');
                         const lockBadge = !canUse && !isUsed ? '<span style="font-size:9px;color:var(--toss-grey-500);margin-left:4px;">🔒 자격선택 필요</span>' : '';
                         return '<div class="linked-benefit-row"' + (rowStyle ? ' style="' + rowStyle + '"' : '') + '>' +
-                            '<input type="checkbox" class="benefit-checkbox" data-benefit-name="' + String(b.name || '').replace(/"/g,'&quot;') + '"' + (isUsed ? ' checked' : '') +
+                            '<input type="checkbox" class="benefit-checkbox" data-benefit-name="' + targetBenefit.name.replace(/"/g,'&quot;') + '"' + (isUsed ? ' checked' : '') +
                             ' style="width:16px;height:16px;cursor:pointer;accent-color:var(--toss-blue);flex-shrink:0;margin-right:8px;"' + (!canUse && !isUsed ? ' disabled' : '') + ' />' +
                             '<div class="linked-benefit-info" style="flex:1;">' +
-                            '<div class="linked-benefit-name"' + (nameStyle ? ' style="' + nameStyle + '"' : '') + '>💸 ' + b.name + lockBadge + '</div>' +
-                            '<div class="linked-benefit-desc">' + b.desc + '</div>' +
+                            '<div class="linked-benefit-name"' + (nameStyle ? ' style="' + nameStyle + '"' : '') + '>💸 ' + targetBenefit.name + lockBadge + '</div>' +
+                            '<div class="linked-benefit-desc">' + targetBenefit.desc + '</div>' +
                             '</div>' +
-                            '<button class="linked-benefit-btn open-url-btn" data-url="' + String(b.link || '').replace(/"/g,'&quot;') + '"' + ((isUsed || !canUse) ? ' disabled style="background:var(--toss-grey-300);color:var(--toss-grey-500);cursor:not-allowed;"' : '') + '>신청</button>' +
+                            '<button class="linked-benefit-btn open-url-btn" data-url="' + targetBenefit.link.replace(/"/g,'&quot;') + '"' + ((isUsed || !canUse) ? ' disabled style="background:var(--toss-grey-300);color:var(--toss-grey-500);cursor:not-allowed;"' : '') + '>신청</button>' +
                             '</div>';
                     }).join('')}
                 </div>
@@ -991,7 +1035,8 @@ function openSheet(dateStr, items) {
         // 행사 신청 버튼 딱 1개만 정의 (중복 다중 버튼 제거)
         let applyBtnsHtml = '';
         if (mainLink) {
-            applyBtnsHtml = `<button class="card-btn open-url-btn" data-url="${String(mainLink || '').replace(/"/g,'&quot;')}" style="width:80%;max-width:360px;">행사 신청</button>`;
+            const btnLabel = (item.tags || []).includes('culture') ? '상세내용 및 예매 바로가기 🔗' : '행사 신청/안내 바로가기';
+            applyBtnsHtml = `<button class="card-btn open-url-btn" data-url="${mainLink.replace(/"/g,'&quot;')}" style="width:80%;max-width:360px;">${btnLabel}</button>`;
         }
 
         const detailHtml = `
@@ -1161,36 +1206,36 @@ function attachTossBanner(containerId) {
     const container = document.getElementById(containerId || 'tossAdBanner');
     if (!container) return;
 
-    if (!isInTossApp) {
-        const banner = document.createElement('div');
-        banner.style.cssText = 'width:100%;min-height:80px;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#0064FF,#00C6FB);border-radius:12px;padding:12px;cursor:pointer;margin-bottom:12px;';
-        banner.innerHTML = '<div style="text-align:center;color:#fff;"><div style="font-size:14px;font-weight:700;margin-bottom:4px;">📱 토스 앱에서 더 많은 혜택을!</div><div style="font-size:11px;opacity:0.9;">지금 토스 앱에서 정부혜택달력을 열어보세요</div></div>';
-        banner.onclick = () => {
-            try { window.location.href = 'intoss-private://govbenefit-hunter'; } catch(e) {}
-        };
-        container.appendChild(banner);
-        return;
+    if (typeof TossAds !== 'undefined' && TossAds.attachBanner && TossAds.attachBanner.isSupported()) {
+        try {
+            activeTossAdBanner = TossAds.attachBanner(
+                'ait.v2.live.c5633be2471a4b9c',
+                container,
+                {
+                    theme: 'auto',
+                    tone: 'blackAndWhite',
+                    variant: 'expanded',
+                    callbacks: {
+                        onAdRendered: (p) => console.log('TossAd rendered:', p.slotId),
+                        onAdFailedToRender: (p) => console.warn('TossAd failed:', p.error?.message),
+                        onNoFill: (p) => console.warn('TossAd no fill')
+                    }
+                }
+            );
+            return;
+        } catch (error) {
+            console.warn('TossAds attachBanner error:', error);
+        }
     }
 
-    if (typeof TossAds === 'undefined' || !TossAds.attachBanner || !TossAds.attachBanner.isSupported()) return;
-    try {
-        activeTossAdBanner = TossAds.attachBanner(
-            'ait.v2.live.c5633be2471a4b9c',
-            container,
-            {
-                theme: 'auto',
-                tone: 'blackAndWhite',
-                variant: 'expanded',
-                callbacks: {
-                    onAdRendered: (p) => console.log('TossAd rendered:', p.slotId),
-                    onAdFailedToRender: (p) => console.warn('TossAd failed:', p.error?.message),
-                    onNoFill: (p) => console.warn('TossAd no fill')
-                }
-            }
-        );
-    } catch (e) {
-        console.warn('TossAds attachBanner error:', e);
-    }
+    // SDK 미지원 환경 → 딥링크 배너 fallback
+    const banner = document.createElement('div');
+    banner.style.cssText = 'width:100%;min-height:80px;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#0064FF,#00C6FB);border-radius:12px;padding:12px;cursor:pointer;margin-bottom:12px;';
+    banner.innerHTML = '<div style="text-align:center;color:#fff;"><div style="font-size:14px;font-weight:700;margin-bottom:4px;">📱 토스 앱에서 더 많은 혜택을!</div><div style="font-size:11px;opacity:0.9;">지금 토스 앱에서 정부혜택달력을 열어보세요</div></div>';
+    banner.onclick = () => {
+        try { window.location.href = 'intoss-private://govbenefit-hunter'; } catch(e) {}
+    };
+    container.appendChild(banner);
 }
 
 // 리워드 광고(Rewarded) 상태 관리
@@ -1206,10 +1251,10 @@ resetRewardTapTarget();
 const REWARDED_AD_ID = 'ait.v2.live.be0a965d07e0432b'; // 실제 상용 출시용 리워드 광고 ID
 
 function preloadRewardedAd() {
-    if (typeof loadRewardedAd === 'undefined' || !loadRewardedAd.isSupported()) {
+    if (typeof loadFullScreenAd === 'undefined' || !loadFullScreenAd.isSupported()) {
         return;
     }
-    loadRewardedAd({
+    loadFullScreenAd({
         options: { adGroupId: REWARDED_AD_ID },
         onEvent: (event) => {
             if (event.type === 'loaded') {
@@ -1224,30 +1269,117 @@ function preloadRewardedAd() {
 }
 
 function tryShowRewardedAd() {
-    if (!rewardedAdLoaded || typeof showRewardedAd === 'undefined' || !showRewardedAd.isSupported()) {
+    if (!rewardedAdLoaded || typeof showFullScreenAd === 'undefined' || !showFullScreenAd.isSupported()) {
         return false;
     }
-    showRewardedAd({
+    showFullScreenAd({
         options: { adGroupId: REWARDED_AD_ID },
         onEvent: (event) => {
             switch (event.type) {
+                case 'userEarnedReward':
                 case 'reward':
                     localStorage.setItem('rewardedOnExit', 'done');
                     addRewardPoints(1);
+                    // 광고 완료 후 즉시 종료 확인 모달 호출
+                    setTimeout(() => {
+                        showExitConfirmModal();
+                    }, 500);
                     break;
                 case 'dismissed':
                 case 'failedToShow':
                     rewardedAdLoaded = false;
                     preloadRewardedAd();
+                    // 광고 종료/실패 후 종료 확인 모달 호출
+                    showExitConfirmModal();
                     break;
             }
         },
         onError: () => {
             rewardedAdLoaded = false;
+            showExitConfirmModal();
         }
     });
     localStorage.setItem('rewardedOnExit', 'pending');
     return true;
+}
+
+// 🚪 프리미엄 다크 테마 커스텀 종료 확인 모달 팝업
+function showExitConfirmModal() {
+    if (document.getElementById('exit-confirm-modal')) return;
+
+    const modal = document.createElement('div');
+    modal.id = 'exit-confirm-modal';
+    modal.style.cssText = `
+        position: fixed;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.65);
+        display: flex; align-items: center; justify-content: center;
+        z-index: 10000;
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
+    `;
+
+    modal.innerHTML = `
+        <div style="
+            background: #1c222e;
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 20px;
+            padding: 24px;
+            width: 85%;
+            max-width: 320px;
+            text-align: center;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            animation: tossModalScale 0.25s ease-out;
+        ">
+            <div style="font-size: 32px; margin-bottom: 12px;">👋</div>
+            <h3 style="font-size: 18px; font-weight: 700; color: #ffffff; margin-bottom: 8px;">종료하시겠습니까?</h3>
+            <p style="font-size: 13px; color: #9ca3af; margin-bottom: 24px; line-height: 1.4;">
+                오늘의 복지 혜택과 실시간 행사 일정을 모두 확인하셨나요?
+            </p>
+            <div style="display: flex; gap: 10px; justify-content: center;">
+                <button id="btn-modal-cancel" style="
+                    flex: 1; padding: 12px;
+                    background: rgba(255,255,255,0.05);
+                    border: 1px solid rgba(255,255,255,0.08);
+                    border-radius: 12px;
+                    color: #e5e7eb; font-weight: 600; font-size: 14px;
+                    cursor: pointer; transition: all 0.2s;
+                ">취소</button>
+                <button id="btn-modal-exit" style="
+                    flex: 1; padding: 12px;
+                    background: #0064ff;
+                    border: none; border-radius: 12px;
+                    color: #ffffff; font-weight: 600; font-size: 14px;
+                    box-shadow: 0 4px 12px rgba(0,100,255,0.3);
+                    cursor: pointer; transition: all 0.2s;
+                ">종료</button>
+            </div>
+        </div>
+        <style>
+            @keyframes tossModalScale {
+                from { transform: scale(0.9); opacity: 0; }
+                to { transform: scale(1); opacity: 1; }
+            }
+        </style>
+    `;
+
+    document.body.appendChild(modal);
+
+    document.getElementById('btn-modal-cancel').onclick = () => {
+        document.body.removeChild(modal);
+    };
+
+    document.getElementById('btn-modal-exit').onclick = () => {
+        try {
+            if (typeof activeTossAdBanner !== 'undefined' && activeTossAdBanner) {
+                activeTossAdBanner.destroy();
+            }
+            if (typeof TossAds !== 'undefined' && TossAds.destroyAll && TossAds.destroyAll.isSupported()) {
+                TossAds.destroyAll();
+            }
+        } catch(e){}
+        window.close();
+    };
 }
 
 // 강제종료 리워드 재개 처리
@@ -1285,6 +1417,20 @@ window.onload = () => {
             });
         } else {
             preloadRewardedAd();
+        }
+
+        // 토스 뒤로가기 버튼 클릭 가로채기 ➡️ 종료 확인 모달 즉시 노출
+        if (typeof graniteEvent !== 'undefined') {
+            try {
+                graniteEvent.addEventListener('backEvent', {
+                    onEvent: () => {
+                        console.log('Toss Back Key Pressed. Showing exit confirm modal...');
+                        showExitConfirmModal();
+                    }
+                });
+            } catch (e) {
+                console.warn('graniteEvent addEventListener error:', e);
+            }
         }
     }
 
