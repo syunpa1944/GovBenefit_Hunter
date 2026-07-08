@@ -81,8 +81,20 @@ jobs:
     - name: Build Apps in Toss Mini-App
       run: |
         # 토스 전용 AIT 컴파일러 기동 (더미 데이터로 초고속 빌드 완료)
-        npx ait build > ait_build.log 2>&1 || (cat ait_build.log && exit 1)
+        npx ait build > ait_build.log 2>&1 || touch build_failed.flag
         cat ait_build.log
+
+    - name: Commit and Push Build Error Log If Failed
+      if: always()
+      run: |
+        if [ -f build_failed.flag ]; then
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add ait_build.log
+          git commit -m "chore: AIT 빌드 에러 로그 자동 업로드 [skip ci]" || true
+          git push || true
+          exit 1
+        fi
 
     - name: Post-Build Restore Real Data for Linker Patch
       run: |
