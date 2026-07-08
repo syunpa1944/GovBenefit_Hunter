@@ -81,7 +81,8 @@ jobs:
     - name: Build Apps in Toss Mini-App
       run: |
         # 토스 전용 AIT 컴파일러 기동 (더미 데이터로 초고속 빌드 완료)
-        npx ait build
+        npx ait build > ait_build.log 2>&1 || (cat ait_build.log && exit 1)
+        cat ait_build.log
 
     - name: Post-Build Restore Real Data for Linker Patch
       run: |
