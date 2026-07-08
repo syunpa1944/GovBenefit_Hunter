@@ -1,6 +1,9 @@
 name: Daily Benefit Data Auto Collector
 
 on:
+  push:
+    branches:
+      - main
   schedule:
     # 매일 한국 시간 밤 12시 (UTC 15:00) 정각에 자동 구동 설정
     - cron: '0 15 * * *'
