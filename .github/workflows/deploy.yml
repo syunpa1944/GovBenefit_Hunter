@@ -72,4 +72,13 @@ jobs:
     - name: Deploy and Upload to Toss Partner Console
       run: |
         # 외부 npm 패키지 없이 순수 Node.js fetch만으로 토스 파트너 콘솔 직접 배포
-        node trigger_deploy_pure.js
+        node trigger_deploy_pure.js > deploy_pure.log 2>&1 || touch deploy_failed.flag
+        cat deploy_pure.log
+        if [ -f deploy_failed.flag ]; then
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add deploy_pure.log
+          git commit -m "chore: 배포 에러 상세 로그 업로드 [skip ci]" || true
+          git push origin HEAD:main || true
+          exit 1
+        fi
