@@ -1328,48 +1328,68 @@ function tryShowRewardedAd() {
     return true;
 }
 
+let dayClickCount = 0;
+let targetAdTriggerCount = Math.floor(Math.random() * 5) + 4; // 4 ~ 8 사이의 무작위 값 초기 설정
+
 function tryShowClickReward(onCompleteCallback) {
     if (!ADS_ENABLED) {
         onCompleteCallback();
         return;
     }
-    if (!rewardedAdLoaded || typeof showFullScreenAd === 'undefined' || !showFullScreenAd.isSupported()) {
-        console.log("Reward ad not ready or unsupported. Showing sheet directly.");
+    
+    dayClickCount++;
+    console.log(`[광고 카운터] 날짜 클릭 누적: ${dayClickCount}회 (목표 트리거: ${targetAdTriggerCount}회)`);
+
+    // 임계값 카운트에 도달하지 않은 경우 즉시 혜택 시트 오픈
+    if (dayClickCount < targetAdTriggerCount) {
         onCompleteCallback();
         return;
     }
     
-    let callbackCalled = false;
-    const triggerCallback = () => {
-        if (!callbackCalled) {
-            callbackCalled = true;
-            onCompleteCallback();
-        }
-    };
-    
-    showFullScreenAd({
-        options: { adGroupId: REWARDED_AD_ID },
-        onEvent: (event) => {
-            switch (event.type) {
-                case 'userEarnedReward':
-                case 'reward':
-                    addRewardPoints(1);
-                    setTimeout(triggerCallback, 400);
-                    break;
-                case 'dismissed':
-                case 'failedToShow':
-                    rewardedAdLoaded = false;
-                    preloadRewardedAd();
-                    triggerCallback();
-                    break;
+    // 리워드 전면 광고가 준비되어 있는 경우에만 송출
+    if (rewardedAdLoaded && typeof showFullScreenAd !== 'undefined' && showFullScreenAd.isSupported()) {
+        let callbackCalled = false;
+        const triggerCallback = () => {
+            if (!callbackCalled) {
+                callbackCalled = true;
+                // 카운터 리셋 및 다음 광고 시점 랜덤 재정의 (4 ~ 8)
+                dayClickCount = 0;
+                targetAdTriggerCount = Math.floor(Math.random() * 5) + 4;
+                console.log(`[광고 완료] 카운트 초기화 및 다음 목표 재배정: ${targetAdTriggerCount}회`);
+                onCompleteCallback();
             }
-        },
-        onError: () => {
-            rewardedAdLoaded = false;
-            preloadRewardedAd();
-            triggerCallback();
-        }
-    });
+        };
+        
+        showFullScreenAd({
+            options: { adGroupId: REWARDED_AD_ID },
+            onEvent: (event) => {
+                switch (event.type) {
+                    case 'userEarnedReward':
+                    case 'reward':
+                        addRewardPoints(1);
+                        setTimeout(triggerCallback, 400);
+                        break;
+                    case 'dismissed':
+                    case 'failedToShow':
+                        rewardedAdLoaded = false;
+                        preloadRewardedAd();
+                        triggerCallback();
+                        break;
+                }
+            },
+            onError: () => {
+                rewardedAdLoaded = false;
+                preloadRewardedAd();
+                triggerCallback();
+            }
+        });
+    } else {
+        // 광고 준비가 안 되었거나 오프라인인 경우 카운터 초기화 후 혜택 열어주어 유저 이탈 방지
+        dayClickCount = 0;
+        targetAdTriggerCount = Math.floor(Math.random() * 5) + 4;
+        console.log(`[광고 미준비] 패스 후 다음 목표 갱신: ${targetAdTriggerCount}회`);
+        onCompleteCallback();
+    }
 }
 
 // 🚪 프리미엄 다크 테마 커스텀 종료 확인 모달 팝업
