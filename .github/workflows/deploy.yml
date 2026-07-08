@@ -54,22 +54,17 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '18'
-        cache: 'npm'
 
-    - name: Install Node Dependencies
+    - name: Build AIT Package (Zero-Dependency Pure Builder)
       run: |
-        npm install
-
-    - name: Build Apps in Toss Mini-App (Vite Bypass Direct Builder)
-      run: |
-        # Vite OOM 및 rmdir 락 교착을 우회하여 2초 내에 직접 규격 .ait 바이너리 조립
-        node build_ait_direct.js > build_direct.log 2>&1 || touch build_failed.flag
-        cat build_direct.log
+        # 외부 npm 패키지 없이 순수 Node.js 내장 모듈만으로 .ait 바이너리 직접 조립
+        node build_ait_pure.js > build_pure.log 2>&1 || touch build_failed.flag
+        cat build_pure.log
         if [ -f build_failed.flag ]; then
           git config --global user.name "github-actions[bot]"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add build_direct.log
-          git commit -m "chore: AIT 직접 빌드 오류 로그 업로드 [skip ci]" || true
+          git add build_pure.log
+          git commit -m "chore: AIT 순수 빌드 오류 로그 업로드 [skip ci]" || true
           git push origin HEAD:main || true
           exit 1
         fi
