@@ -1,0 +1,1 @@
+window.BENEFITS_DATA = {};

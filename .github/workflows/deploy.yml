@@ -57,6 +57,16 @@ jobs:
       run: |
         npm install
 
+    - name: Sync Assets to Public Directory
+      run: |
+        # Vite 빌드 시 대용량 파일(data.js 18MB)을 번들링하지 않고 그대로 복사하기 위해 public/ 동기화
+        mkdir -p public
+        cp -f app.js public/app.js
+        cp -f data.js public/data.js
+        cp -f data.json public/data.json
+        cp -f style.css public/style.css 2>/dev/null || true
+        cp -f app_logo_main_1782592690933.png public/app_logo_main_1782592690933.png 2>/dev/null || true
+
     - name: Build Apps in Toss Mini-App
       run: |
         # 토스 전용 AIT 컴파일러 기동
