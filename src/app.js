@@ -2,7 +2,7 @@ const isInTossApp = typeof window.TossAds !== 'undefined' || typeof window.AppsI
 
 // 오늘 날짜 동적 연동 (정식 상용 출시 반영)
 const FIXED_TODAY = new Date();
-const ADS_ENABLED = isInTossApp; // 토스 앱 내부에서만 광고 활성화
+const ADS_ENABLED = true; // 항상 활성화, attachTossBanner/tryShowRewardedAd 내부에서 SDK 유무 체크
 const REWARD_KEY = 'rewardPoints';
 let currentYear = FIXED_TODAY.getFullYear();
 let currentMonth = FIXED_TODAY.getMonth();

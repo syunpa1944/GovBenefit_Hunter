@@ -1,6 +1,6 @@
 {
   "name": "govbenefit-hunter",
-  "version": "20260708-62",
+  "version": "20260708-63",
   "description": "정부혜택털기 - 여행/복지 스마트 캘린더 미니앱 (가로슬라이딩 필터+자격9종+문화행사 카테고리 분류)",
   "main": "app.js",
   "scripts": {
