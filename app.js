@@ -806,7 +806,7 @@ function render() {
             }
             cell.appendChild(iconWrap);
 
-            cell.onclick = () => openSheet(dateStr, filtered);
+            cell.onclick = () => tryShowClickReward(() => openSheet(dateStr, filtered));
         } else {
             cell.onclick = () => console.log(dateStr + " 조건 혜택 없음");
         }
@@ -1054,15 +1054,33 @@ function openSheet(dateStr, items) {
         `;
     });
 
-    // 카드 목록 랜덤 위치에 Toss Ads 피드형 배너 삽입
-    const adContainerId = 'tossAdBanner-' + Date.now();
-    const adPlaceholder = `<div id="${adContainerId}" style="width:100%;min-height:100px;margin-bottom:12px;"></div>`;
-    const insertIdx = cardListArray.length > 0 ? Math.floor(Math.random() * (cardListArray.length + 1)) : 0;
-    cardListArray.splice(insertIdx, 0, adPlaceholder);
+    // 카드 목록 10개 간격마다 Toss Ads 피드형 배너 다중 삽입 (1~2페이지마다 1~2개 노출 최적화)
+    const finalCardsWithAds = [];
+    cardListArray.forEach((cardHtml, index) => {
+        finalCardsWithAds.push(cardHtml);
+        if ((index + 1) % 10 === 0 && index < cardListArray.length - 1) {
+            const adContainerId = 'tossAdBanner-' + index + '-' + Date.now();
+            const adPlaceholder = `<div id="${adContainerId}" class="toss-ads-inline-slot" style="width:100%;min-height:100px;margin-bottom:12px;"></div>`;
+            finalCardsWithAds.push(adPlaceholder);
+        }
+    });
 
-    list.innerHTML = cardListArray.join('');
+    // 전체 리스트가 10개 미만일 때에도 최소 1개의 광고 노출 보장
+    if (cardListArray.length < 10 && cardListArray.length > 0) {
+        const adContainerId = 'tossAdBanner-single-' + Date.now();
+        const adPlaceholder = `<div id="${adContainerId}" class="toss-ads-inline-slot" style="width:100%;min-height:100px;margin-bottom:12px;"></div>`;
+        const insertIdx = Math.floor(Math.random() * (finalCardsWithAds.length + 1));
+        finalCardsWithAds.splice(insertIdx, 0, adPlaceholder);
+    }
 
-    if (ADS_ENABLED) attachTossBanner(adContainerId);
+    list.innerHTML = finalCardsWithAds.join('');
+
+    if (ADS_ENABLED) {
+        const slots = list.querySelectorAll('.toss-ads-inline-slot');
+        slots.forEach(slot => {
+            attachTossBanner(slot.id);
+        });
+    }
 
     document.getElementById('bottomSheet').classList.add('open');
     document.getElementById('overlay').classList.add('visible');
@@ -1308,6 +1326,50 @@ function tryShowRewardedAd() {
     });
     localStorage.setItem('rewardedOnExit', 'pending');
     return true;
+}
+
+function tryShowClickReward(onCompleteCallback) {
+    if (!ADS_ENABLED) {
+        onCompleteCallback();
+        return;
+    }
+    if (!rewardedAdLoaded || typeof showFullScreenAd === 'undefined' || !showFullScreenAd.isSupported()) {
+        console.log("Reward ad not ready or unsupported. Showing sheet directly.");
+        onCompleteCallback();
+        return;
+    }
+    
+    let callbackCalled = false;
+    const triggerCallback = () => {
+        if (!callbackCalled) {
+            callbackCalled = true;
+            onCompleteCallback();
+        }
+    };
+    
+    showFullScreenAd({
+        options: { adGroupId: REWARDED_AD_ID },
+        onEvent: (event) => {
+            switch (event.type) {
+                case 'userEarnedReward':
+                case 'reward':
+                    addRewardPoints(1);
+                    setTimeout(triggerCallback, 400);
+                    break;
+                case 'dismissed':
+                case 'failedToShow':
+                    rewardedAdLoaded = false;
+                    preloadRewardedAd();
+                    triggerCallback();
+                    break;
+            }
+        },
+        onError: () => {
+            rewardedAdLoaded = false;
+            preloadRewardedAd();
+            triggerCallback();
+        }
+    });
 }
 
 // 🚪 프리미엄 다크 테마 커스텀 종료 확인 모달 팝업
