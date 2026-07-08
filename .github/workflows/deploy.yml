@@ -70,9 +70,6 @@ jobs:
         fi
 
     - name: Deploy and Upload to Toss Partner Console
-      env:
-        # 배포 업로드용 API Key가 주입되어 기동됨
-        TOSS_DEPLOY_TOKEN: ${{ secrets.TOSS_DEPLOY_TOKEN }}
       run: |
-        # 최종 빌드된 AIT 바이너리를 토스 파트너 콘솔로 배포 자동 전송
-        node trigger_deploy.js
+        # 외부 npm 패키지 없이 순수 Node.js fetch만으로 토스 파트너 콘솔 직접 배포
+        node trigger_deploy_pure.js
