@@ -7,6 +7,7 @@
     "build": "echo 'No build step required for static assets'"
   },
   "devDependencies": {
+    "@apps-in-toss/ait-format": "^1.0.0",
     "@apps-in-toss/cli": "^2.10.1",
     "@apps-in-toss/web-framework": "^2.10.1",
     "vite": "^8.1.3"
