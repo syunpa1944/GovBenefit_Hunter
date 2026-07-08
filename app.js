@@ -810,7 +810,16 @@ function render() {
             }
             cell.appendChild(iconWrap);
 
-            cell.onclick = () => openSheet(dateStr, filtered);
+            cell.onclick = () => {
+                openSheet(dateStr, filtered);
+                if (ADS_ENABLED && !rewardedThisSession) {
+                    rewardTapCount++;
+                    if (rewardTapCount >= rewardTapTarget) {
+                        tryShowRewardedAd();
+                        rewardedThisSession = true;
+                    }
+                }
+            };
         } else {
             cell.onclick = () => console.log(dateStr + " 조건 혜택 없음");
         }
@@ -1073,12 +1082,6 @@ function openSheet(dateStr, items) {
 
     if (ADS_ENABLED) {
         attachTossBanner(adContainerId);
-        if (!rewardedThisSession) {
-            setTimeout(() => {
-                tryShowRewardedAd();
-                rewardedThisSession = true;
-            }, 500);
-        }
     }
 
     document.getElementById('bottomSheet').classList.add('open');
@@ -1240,6 +1243,13 @@ function attachTossBanner(containerId) {
 // 리워드 광고(Rewarded) 상태 관리
 let rewardedAdLoaded = false;
 let rewardedThisSession = false;
+let rewardTapCount = 0;
+let rewardTapTarget = 0;
+function resetRewardTapTarget() {
+    rewardTapCount = 0;
+    rewardTapTarget = Math.floor(Math.random() * 5) + 4;
+}
+resetRewardTapTarget();
 const REWARDED_AD_ID = 'ait.v2.live.be0a965d07e0432b'; // 실제 상용 출시용 리워드 광고 ID
 
 function preloadRewardedAd() {
