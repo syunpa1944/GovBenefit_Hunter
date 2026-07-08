@@ -1,6 +1,9 @@
 name: Daily Benefit Data Auto Collector
 
 on:
+  push:
+    branches:
+      - main
   schedule:
     # 매일 한국 시간 밤 12시 (UTC 15:00) 정각에 자동 구동 설정
     - cron: '0 15 * * *'
@@ -54,26 +57,31 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '18'
-        cache: 'npm'
 
-    - name: Install Node Dependencies
+    - name: Build AIT Package (Zero-Dependency Pure Builder)
       run: |
-        npm install
-
-    - name: Build Apps in Toss Mini-App
-      run: |
-        # 토스 전용 AIT 컴파일러 기동
-        npx ait build
-
-    - name: Vite Chunk Asset Double-Mount Patch
-      run: |
-        # Vite 컴파일 시 유실되는 에셋 청크 더블마운트 링커 패치 가동
-        node patch_ait.js govbenefit-hunter.ait
+        # 외부 npm 패키지 없이 순수 Node.js 내장 모듈만으로 .ait 바이너리 직접 조립
+        node build_ait_pure.js > build_pure.log 2>&1 || touch build_failed.flag
+        cat build_pure.log
+        if [ -f build_failed.flag ]; then
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add build_pure.log
+          git commit -m "chore: AIT 순수 빌드 오류 로그 업로드 [skip ci]" || true
+          git push origin HEAD:main || true
+          exit 1
+        fi
 
     - name: Deploy and Upload to Toss Partner Console
-      env:
-        # 배포 업로드용 API Key가 주입되어 기동됨
-        TOSS_DEPLOY_TOKEN: ${{ secrets.TOSS_DEPLOY_TOKEN }}
       run: |
-        # 최종 빌드된 AIT 바이너리를 토스 파트너 콘솔로 배포 자동 전송
-        node trigger_deploy.js
+        # 외부 npm 패키지 없이 순수 Node.js fetch만으로 토스 파트너 콘솔 직접 배포
+        node trigger_deploy_pure.js > deploy_pure.log 2>&1 || touch deploy_failed.flag
+        cat deploy_pure.log
+        if [ -f deploy_failed.flag ]; then
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add deploy_pure.log
+          git commit -m "chore: 배포 에러 상세 로그 업로드 [skip ci]" || true
+          git push origin HEAD:main || true
+          exit 1
+        fi

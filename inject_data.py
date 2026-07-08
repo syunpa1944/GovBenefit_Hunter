@@ -481,8 +481,21 @@ if __name__ == "__main__":
         f.write(";\n")
     print(f"SUCCESS: data.js written ({os.path.getsize(js_path):,} bytes)")
 
-    # data.json — 호환성 유지
+    # data.json — 호환성 유지 및 원격 fetch용
     json_path = os.path.join(script_dir, "data.json")
     with open(json_path, 'w', encoding='utf-8') as f:
         json.dump(result, f, ensure_ascii=False, indent=2)
     print(f"SUCCESS: data.json written ({os.path.getsize(json_path):,} bytes)")
+
+    # public/ 디렉토리에도 복사 (Vite 빌드 시 번들링 없이 dist에 그대로 포함시키기 위함)
+    import shutil
+    public_dir = os.path.join(script_dir, "public")
+    os.makedirs(public_dir, exist_ok=True)
+    shutil.copy2(js_path, os.path.join(public_dir, "data.js"))
+    shutil.copy2(json_path, os.path.join(public_dir, "data.json"))
+    # app.js도 public에 동기화 (Vite가 번들링하지 않도록)
+    app_js_path = os.path.join(script_dir, "app.js")
+    if os.path.exists(app_js_path):
+        shutil.copy2(app_js_path, os.path.join(public_dir, "app.js"))
+    print(f"SUCCESS: public/ directory synced for Vite build")
+
