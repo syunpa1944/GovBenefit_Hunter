@@ -60,9 +60,17 @@ jobs:
       run: |
         npm install
 
+    - name: Pre-Build Dummy Data Swap
+      run: |
+        # 18MB 대용량 데이터로 인한 Vite 빌드 OOM을 방지하기 위해 임시 백업 및 더미화
+        cp data.js data_real.js
+        cp data.json data_real.json
+        echo "window.BENEFITS_DATA = {};" > data.js
+        echo "{}" > data.json
+
     - name: Sync Assets to Public Directory
       run: |
-        # Vite 빌드 시 대용량 파일(data.js 18MB)을 번들링하지 않고 그대로 복사하기 위해 public/ 동기화
+        # Vite 빌드 시 대용량 파일(data.js 18MB)을 번들링하지 않고 그대로 복사하기 위해 public/ 동기화 (더미로 진행)
         mkdir -p public
         cp -f app.js public/app.js
         cp -f data.js public/data.js
@@ -72,12 +80,18 @@ jobs:
 
     - name: Build Apps in Toss Mini-App
       run: |
-        # 토스 전용 AIT 컴파일러 기동
+        # 토스 전용 AIT 컴파일러 기동 (더미 데이터로 초고속 빌드 완료)
         npx ait build
+
+    - name: Post-Build Restore Real Data for Linker Patch
+      run: |
+        # 링커 패치가 18MB 진짜 데이터를 주입할 수 있도록 백업본을 다시 data.js / data.json으로 원복
+        cp -f data_real.js data.js
+        cp -f data_real.json data.json
 
     - name: Vite Chunk Asset Double-Mount Patch
       run: |
-        # Vite 컴파일 시 유실되는 에셋 청크 더블마운트 링커 패치 가동
+        # Vite 컴파일 시 유실되는 에셋 청크 더블마운트 링커 패치 가동 (여기서 진짜 18MB 데이터 주입)
         node patch_ait.js govbenefit-hunter.ait
 
     - name: Deploy and Upload to Toss Partner Console
