@@ -55,10 +55,10 @@ jobs:
       env:
         AIT_ACCESS_TOKEN: ${{ secrets.AIT_ACCESS_TOKEN }}
       run: |
-        # 신규 도입된 esbuild 기반 정적 빌드 및 번들링 실행
         npm install
         node build_static.js
-        npx ait build
+        # 빌드 출력을 리디렉션하지 않고 터미널에 직접 출력하여 실패 원인 가시화
+        npx ait build 2>&1 || (echo "=== AIT BUILD FAILED ===" && exit 1)
 
     - name: Deploy and Upload to Toss Partner Console
       env:
