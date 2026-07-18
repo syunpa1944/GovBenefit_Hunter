@@ -52,6 +52,8 @@ jobs:
         node-version: '18'
 
     - name: Build AIT Package
+      env:
+        AIT_ACCESS_TOKEN: ${{ secrets.AIT_ACCESS_TOKEN }}
       run: |
         # 신규 도입된 esbuild 기반 정적 빌드 및 번들링 실행
         npm install
