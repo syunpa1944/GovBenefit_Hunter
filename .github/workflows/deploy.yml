@@ -49,7 +49,7 @@ jobs:
       run: |
         git config --global user.name "github-actions[bot]"
         git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
-        git add data.js data.json test-app/public/data.js test-app/public/data.json
+        git add data.js data.json dist/web/data.js dist/web/data.json test-app/public/data.js test-app/public/data.json
         # 변경사항이 있는 경우에만 안전 커밋 및 푸시 가동
         git diff --quiet && git diff --staged --quiet || (git commit -m "chore: 공공데이터 일간 캘린더 데이터 자동 갱신 [skip ci]" && git push)
 
@@ -58,30 +58,16 @@ jobs:
       with:
         node-version: '18'
 
-    - name: Build AIT Package (Zero-Dependency Pure Builder)
+    - name: Build AIT Package
       run: |
-        # 외부 npm 패키지 없이 순수 Node.js 내장 모듈만으로 .ait 바이너리 직접 조립
-        node build_ait_pure.js > build_pure.log 2>&1 || touch build_failed.flag
-        cat build_pure.log
-        if [ -f build_failed.flag ]; then
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add build_pure.log
-          git commit -m "chore: AIT 순수 빌드 오류 로그 업로드 [skip ci]" || true
-          git push origin HEAD:main || true
-          exit 1
-        fi
+        # 신규 도입된 esbuild 기반 정적 빌드 및 번들링 실행
+        npm install
+        node build_static.js
+        npx ait build
 
     - name: Deploy and Upload to Toss Partner Console
+      env:
+        AIT_ACCESS_TOKEN: ${{ secrets.AIT_ACCESS_TOKEN }}
       run: |
-        # 외부 npm 패키지 없이 순수 Node.js fetch만으로 토스 파트너 콘솔 직접 배포
-        node trigger_deploy_pure.js > deploy_pure.log 2>&1 || touch deploy_failed.flag
-        cat deploy_pure.log
-        if [ -f deploy_failed.flag ]; then
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add deploy_pure.log
-          git commit -m "chore: 배포 에러 상세 로그 업로드 [skip ci]" || true
-          git push origin HEAD:main || true
-          exit 1
-        fi
+        # 정식 배포 명령 수행
+        npx ait deploy

@@ -14,7 +14,7 @@ export default defineConfig({
     port: 5173,
     commands: {
       dev: "vite dev",
-      build: "vite build",
+      build: "node build_static.js",
     },
   },
   permissions: [],

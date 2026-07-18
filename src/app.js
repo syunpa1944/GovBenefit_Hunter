@@ -1,4 +1,4 @@
-﻿// 로드된 2.x 프레임워크 번들로부터 TossAds 전역 바인딩 확보
+// 로드된 2.x 프레임워크 번들로부터 TossAds 전역 바인딩 확보
 if (typeof TossAds === 'undefined' && window.AppsInToss) {
     window.TossAds = window.AppsInToss.TossAds;
 }
@@ -810,11 +810,16 @@ function render() {
 
             cell.onclick = () => {
                 openSheet(dateStr, filtered);
-                if (ADS_ENABLED && !rewardedThisSession) {
+                if (ADS_ENABLED) {
                     rewardTapCount++;
                     if (rewardTapCount >= rewardTapTarget) {
-                        tryShowRewardedAd();
-                        rewardedThisSession = true;
+                        if (tryShowRewardedAd()) {
+                            resetRewardTapTarget();
+                            preloadRewardedAd();
+                        } else {
+                            resetRewardTapTarget();
+                            preloadRewardedAd();
+                        }
                     }
                 }
             };
@@ -1070,16 +1075,27 @@ function openSheet(dateStr, items) {
         `;
     });
 
-    // 카드 목록 랜덤 위치에 Toss Ads 피드형 배너 삽입
-    const adContainerId = 'tossAdBanner-' + Date.now();
-    const adPlaceholder = `<div id="${adContainerId}" style="width:100%;min-height:100px;margin-bottom:12px;"></div>`;
-    const insertIdx = cardListArray.length > 0 ? Math.floor(Math.random() * (cardListArray.length + 1)) : 0;
-    cardListArray.splice(insertIdx, 0, adPlaceholder);
+    // 카드 목록 10~15개마다 피드형 배너 광고 1개씩 삽입
+    const adContainerIds = [];
+    if (cardListArray.length > 0) {
+        const AD_INTERVAL_MIN = 10;
+        const AD_INTERVAL_MAX = 15;
+        let nextAdAt = AD_INTERVAL_MIN + Math.floor(Math.random() * (AD_INTERVAL_MAX - AD_INTERVAL_MIN + 1));
+        let inserted = 0;
+        for (let i = nextAdAt; i < cardListArray.length + inserted; i += nextAdAt + 1) {
+            const adId = 'tossAdBanner-' + Date.now() + '-' + inserted;
+            const adPlaceholder = `<div id="${adId}" style="width:100%;min-height:100px;margin-bottom:12px;"></div>`;
+            cardListArray.splice(i, 0, adPlaceholder);
+            adContainerIds.push(adId);
+            inserted++;
+            nextAdAt = AD_INTERVAL_MIN + Math.floor(Math.random() * (AD_INTERVAL_MAX - AD_INTERVAL_MIN + 1));
+        }
+    }
 
     list.innerHTML = cardListArray.join('');
 
-    if (ADS_ENABLED) {
-        attachTossBanner(adContainerId);
+    if (ADS_ENABLED && adContainerIds.length > 0) {
+        adContainerIds.forEach(id => attachTossBanner(id));
     }
 
     document.getElementById('bottomSheet').classList.add('open');
@@ -1144,10 +1160,7 @@ document.getElementById('sidoSelect').addEventListener('change', onSidoChange);
 document.getElementById('sigunguSelect').addEventListener('change', onSigunguChange);
 
 function closeSheet() {
-    if (activeTossAdBanner) {
-        activeTossAdBanner.destroy();
-        activeTossAdBanner = null;
-    }
+    destroyAllTossBanners();
     document.getElementById('bottomSheet').classList.remove('open');
     document.getElementById('overlay').classList.remove('visible');
     currentOpenedSheetDate = null;
@@ -1195,20 +1208,21 @@ function openMapUrl(googleUrl) {
     }, 1000);
 }
 
-// TossAds 배너 인스턴스를 관리하기 위한 변수
-let activeTossAdBanner = null;
+// TossAds 배너 인스턴스를 관리하기 위한 배열 (복수 배너 동시 지원)
+let activeTossAdBanners = [];
+
+function destroyAllTossBanners() {
+    activeTossAdBanners.forEach(b => { try { b.destroy(); } catch(e) {} });
+    activeTossAdBanners = [];
+}
 
 function attachTossBanner(containerId) {
-    if (activeTossAdBanner) {
-        activeTossAdBanner.destroy();
-        activeTossAdBanner = null;
-    }
     const container = document.getElementById(containerId || 'tossAdBanner');
     if (!container) return;
 
     if (typeof TossAds !== 'undefined' && TossAds.attachBanner && TossAds.attachBanner.isSupported()) {
         try {
-            activeTossAdBanner = TossAds.attachBanner(
+            const bannerInstance = TossAds.attachBanner(
                 'ait.v2.live.c5633be2471a4b9c',
                 container,
                 {
@@ -1222,6 +1236,7 @@ function attachTossBanner(containerId) {
                     }
                 }
             );
+            activeTossAdBanners.push(bannerInstance);
             return;
         } catch (error) {
             console.warn('TossAds attachBanner error:', error);
@@ -1245,7 +1260,7 @@ let rewardTapCount = 0;
 let rewardTapTarget = 0;
 function resetRewardTapTarget() {
     rewardTapCount = 0;
-    rewardTapTarget = Math.floor(Math.random() * 5) + 4;
+    rewardTapTarget = Math.floor(Math.random() * 3) + 3;
 }
 resetRewardTapTarget();
 const REWARDED_AD_ID = 'ait.v2.live.be0a965d07e0432b'; // 실제 상용 출시용 리워드 광고 ID
@@ -1371,14 +1386,17 @@ function showExitConfirmModal() {
 
     document.getElementById('btn-modal-exit').onclick = () => {
         try {
-            if (typeof activeTossAdBanner !== 'undefined' && activeTossAdBanner) {
-                activeTossAdBanner.destroy();
-            }
+            destroyAllTossBanners();
             if (typeof TossAds !== 'undefined' && TossAds.destroyAll && TossAds.destroyAll.isSupported()) {
                 TossAds.destroyAll();
             }
         } catch(e){}
-        window.close();
+        // 토스 앱인토스 SDK closeView 브릿지로 앱 종료 (window.close는 웹뷰에서 동작하지 않음)
+        if (typeof closeView !== 'undefined') {
+            try { closeView(); } catch(e) { window.close(); }
+        } else {
+            window.close();
+        }
     };
 }
 
@@ -1442,10 +1460,7 @@ window.onload = () => {
 
 window.onbeforeunload = () => {
     if (ADS_ENABLED) {
-        if (activeTossAdBanner) {
-            activeTossAdBanner.destroy();
-            activeTossAdBanner = null;
-        }
+        destroyAllTossBanners();
         if (typeof TossAds !== 'undefined' && TossAds.destroyAll && TossAds.destroyAll.isSupported()) {
             TossAds.destroyAll();
         }
