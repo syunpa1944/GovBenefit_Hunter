@@ -47,6 +47,8 @@ jobs:
         cp data.json test-app/public/data.json
 
     - name: Commit and Push Updated Data
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         git config --global user.name "github-actions[bot]"
         git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -54,7 +56,7 @@ jobs:
         # 변경사항이 있는 경우에만 안전 커밋 및 푸시 가동
         git diff --quiet && git diff --staged --quiet || (
           git commit -m "chore: 공공데이터 일간 캘린더 데이터 자동 갱신 [skip ci]"
-          git push origin main 2>&1 || (echo "=== GIT PUSH FAILED WITH ERROR ===" && exit 1)
+          git push https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git HEAD:main
         )
 
     - name: Set up Node.js
