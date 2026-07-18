@@ -41,7 +41,8 @@ jobs:
       run: |
         # 공공 API 보안키를 환경변수로 주입받아 실시간 문화/정부혜택 데이터 수집 및 병합
         python inject_data.py
-        # .ait 빌드용 test-app/public/에도 동일 데이터 복사
+        # 디렉토리 안전 강제 생성 후 복사 진행
+        mkdir -p test-app/public
         cp data.js test-app/public/data.js
         cp data.json test-app/public/data.json
 
