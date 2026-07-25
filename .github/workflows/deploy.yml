@@ -54,7 +54,8 @@ jobs:
     - name: Build AIT Package
       env:
         AIT_ACCESS_TOKEN: ${{ secrets.AIT_ACCESS_TOKEN }}
-        DEBUG: "*" # 상세 디버그 환경변수 인가
+        NODE_OPTIONS: "--max-old-space-size=4096" # 메모리 고갈 방지 힙 상향
+        DEBUG: "*"
       run: |
         npm install
         node build_static.js
@@ -66,6 +67,6 @@ jobs:
     - name: Deploy and Upload to Toss Partner Console
       env:
         AIT_ACCESS_TOKEN: ${{ secrets.AIT_ACCESS_TOKEN }}
+        NODE_OPTIONS: "--max-old-space-size=4096" # 최종 업로드 메모리 고갈 방지
       run: |
-        # 정식 배포 명령 수행
-        npx ait deploy
+        npx ait deploy --app-id 32871 --version-name $(date +'%Y%m%d')-${{ github.run_number }} 2>&1
