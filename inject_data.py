@@ -424,12 +424,24 @@ def build_data():
                 elif ac == 41:
                     specific_benefits.append({"name": "경기지역화폐", "desc": "경기도 내 축제 행사장 결제 시 최대 10% 인센티브", "link": "https://www.gmoney.or.kr/"})
 
+                # 4대 카테고리 정밀 분류 태깅
+                full_text = f"{ev['title']} {ev['place']} {realm}"
+                item_type = "축제/행사"
+                if any(k in full_text for k in ["지원금", "바우처", "수당", "보조금", "포인트", "장학금", "문화누리", "도약계좌"]):
+                    item_type = "정부지원금"
+                elif any(k in full_text for k in ["환급", "페이백", "캐시백", "지역화폐", "상품권", "제로페이", "동백전", "인센티브"]):
+                    item_type = "지자체환급금"
+                elif any(k in full_text for k in ["축제", "페스티벌", "행사", "박람회", "공연", "체험", "야행", "물놀이"]):
+                    item_type = "축제/행사"
+                else:
+                    item_type = "생활/기타"
+
                 data[date_key].append({
                     "id": 1000000 + i * 1000 + d,
                     "title": ev["title"],
                     "amount": "공공 문화 할인 혜택 적용 가능",
                     "period": f"{ev_start.strftime('%Y.%m.%d')} ~ {ev_end.strftime('%Y.%m.%d')}",
-                    "type": "행사",
+                    "type": item_type,
                     "source": ev["url"],
                     "note": f"[{an} 문화 알림] {ev['title']}. 장소: {ev['place']}. 분야: {realm}",
                     "color": color,

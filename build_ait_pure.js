@@ -10,15 +10,59 @@ const zlib = require('zlib');
 
 // === 설정 ===
 const appJson = JSON.parse(fs.readFileSync(path.join(__dirname, 'app.json'), 'utf-8'));
-const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'utf-8'));
+let packageJson;
+try {
+    packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'utf-8'));
+} catch (e) {
+    packageJson = { name: 'govbenefit-hunter', version: '0.0.0' };
+}
 const appName = appJson.appName || packageJson.name || 'govbenefit-hunter';
 const runtimeVersion = '0.84.0';
 const sdkVersion = '2.10.1';
 const createdBy = 'antigravity-pure-builder/2.0.0';
 
-// === 파일 목록 정의 ===
-const webAssets = ['index.html', 'app.js', 'style.css', 'data.js', 'data.json',
-    'app_logo_main_1782592690933.png', 'icon.png'];
+// === Vite 빌드 먼저 실행 (module import 번들링) ===
+const VITE_DIST = path.join(__dirname, 'dist');
+if (!fs.existsSync(path.join(VITE_DIST, 'index.html'))) {
+    console.log('npx vite build 실행 중...');
+    try {
+        require('child_process').execSync('npx vite build', { cwd: __dirname, stdio: 'inherit', timeout: 120000 });
+    } catch (e) {
+        console.warn('Vite build 실패, raw 파일로 폴백:', e.message);
+    }
+}
+
+// === 파일 목록 동적 수집 (Vite dist 우선) ===
+function collectFiles(dir, prefix) {
+    const files = [];
+    if (!fs.existsSync(dir)) return files;
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
+        if (entry.isDirectory()) {
+            files.push(...collectFiles(path.join(dir, entry.name), rel));
+        } else {
+            files.push(rel);
+        }
+    }
+    return files;
+}
+
+const webAssets = [];
+// Vite dist에 index.html이 있으면 Vite 산출물 사용
+if (fs.existsSync(path.join(VITE_DIST, 'index.html'))) {
+    webAssets.push('index.html');
+    webAssets.push(...collectFiles(path.join(VITE_DIST, 'assets'), 'assets'));
+    console.log('Vite dist 출력 사용');
+} else {
+    // Vite 없는 구형 모드: raw 파일
+    webAssets.push('app.js');
+    console.log('Raw 파일 모드');
+}
+// 공통 데이터 파일
+['data.js', 'data.json'].forEach(f => {
+    if (fs.existsSync(path.join(__dirname, f))) webAssets.push(f);
+});
+
 const nativeBundles = ['bundle.android.0_72_6.js', 'bundle.android.0_84_0.js',
     'bundle.android.js', 'bundle.ios.0_72_6.js', 'bundle.ios.0_84_0.js', 'bundle.ios.js'];
 
@@ -220,7 +264,9 @@ async function build() {
     let totalSize = 0;
 
     for (const file of webAssets) {
-        const fp = path.join(__dirname, file);
+        // Vite dist 우선, 없으면 root
+        let fp = path.join(VITE_DIST, file);
+        if (!fs.existsSync(fp)) { fp = path.join(__dirname, file); }
         if (!fs.existsSync(fp)) { console.warn(`  ⚠️ 스킵: ${file}`); continue; }
         const data = fs.readFileSync(fp);
         const hash = crypto.createHash('sha256').update(data).digest('hex');
@@ -235,7 +281,8 @@ async function build() {
     }
 
     for (const bundle of nativeBundles) {
-        const fp = path.join(__dirname, bundle);
+        let fp = path.join(VITE_DIST, bundle);
+        if (!fs.existsSync(fp)) { fp = path.join(__dirname, bundle); }
         if (!fs.existsSync(fp)) continue;
         const data = fs.readFileSync(fp);
         const hash = crypto.createHash('sha256').update(data).digest('hex');
