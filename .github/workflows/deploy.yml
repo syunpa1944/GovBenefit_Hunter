@@ -54,11 +54,14 @@ jobs:
     - name: Build AIT Package
       env:
         AIT_ACCESS_TOKEN: ${{ secrets.AIT_ACCESS_TOKEN }}
+        DEBUG: "*" # 상세 디버그 환경변수 인가
       run: |
         npm install
         node build_static.js
-        # 빌드 출력을 리디렉션하지 않고 터미널에 직접 출력하여 실패 원인 가시화
-        npx ait build 2>&1 || (echo "=== AIT BUILD FAILED ===" && exit 1)
+        echo "=== CHECKING GENERATED ASSETS IN DIST/WEB ==="
+        ls -la dist/web || true
+        echo "=== STARTING AIT VERBOSE BUILD ==="
+        npx ait build --verbose 2>&1 || (echo "=== AIT BUILD FAILED ===" && exit 1)
 
     - name: Deploy and Upload to Toss Partner Console
       env:
