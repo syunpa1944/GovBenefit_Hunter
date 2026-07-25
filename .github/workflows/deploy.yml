@@ -60,8 +60,8 @@ jobs:
         node build_static.js
         echo "=== CHECKING GENERATED ASSETS IN DIST/WEB ==="
         ls -la dist/web || true
-        echo "=== STARTING AIT VERBOSE BUILD ==="
-        npx ait build --verbose 2>&1 || (echo "=== AIT BUILD FAILED ===" && exit 1)
+        echo "=== STARTING AIT BUILD ==="
+        npx ait build 2>&1 || (echo "=== AIT BUILD FAILED ===" && exit 1)
 
     - name: Deploy and Upload to Toss Partner Console
       env:
