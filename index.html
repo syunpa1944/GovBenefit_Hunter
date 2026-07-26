@@ -285,10 +285,33 @@
                 <div id="rewardDisplay" class="reward-display">❤️ 0</div>
             </div>
             
+            <!-- 실시간 키워드 통합 검색창 및 검색 버튼 -->
+            <div class="search-box-row" style="margin-bottom: 10px; display: flex; gap: 8px; align-items: center;">
+                <input type="text" id="searchInput" placeholder="🔍 혜택명, 내용, 키워드 검색..." style="flex: 1; height: 44px; border-radius: 12px; border: 1px solid #D1D5DB; background: #FFFFFF; padding: 0 14px; font-size: 14px; outline: none; font-weight: 600; color: #1F2937; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                <button id="searchBtn" type="button" style="height: 44px; padding: 0 16px; background: #0064FF; color: white; border: none; border-radius: 12px; font-size: 14px; font-weight: 700; cursor: pointer; white-space: nowrap; box-shadow: 0 2px 6px rgba(0,100,255,0.25);">검색</button>
+            </div>
+
             <!-- 지역별 (전국, 시/도, 군/구) 다단계 필터 -->
             <div class="area-filter-row">
                 <select id="sidoSelect" class="area-select">
                     <option value="0">전국 (시/도 선택)</option>
+                    <option value="11">서울</option>
+                    <option value="28">인천</option>
+                    <option value="41">경기</option>
+                    <option value="26">부산</option>
+                    <option value="27">대구</option>
+                    <option value="29">광주</option>
+                    <option value="30">대전</option>
+                    <option value="31">울산</option>
+                    <option value="36">세종</option>
+                    <option value="42">강원</option>
+                    <option value="43">충북</option>
+                    <option value="44">충남</option>
+                    <option value="45">전북</option>
+                    <option value="46">전남</option>
+                    <option value="47">경북</option>
+                    <option value="48">경남</option>
+                    <option value="50">제주</option>
                 </select>
                 <select id="sigunguSelect" class="area-select">
                     <option value="0">시/군/구 선택</option>

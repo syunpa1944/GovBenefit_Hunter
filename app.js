@@ -385,6 +385,44 @@ async function loadBenefitsData() {
     }
 }
 
+// 통합 필터링 함수: 카테고리(개별/중복), 지역(시도/시군구), 내 자격 조건 연동
+function isItemMatchingFilter(item) {
+    if (item.isAd) return false;
+
+    // 1. 카테고리(유형) 필터: activeFilters가 비어있지 않으면 태그 중 하나 이상 매칭
+    const isTypeMatch = activeFilters.length === 0 || activeFilters.some(f => (item.tags || []).includes(f));
+    if (!isTypeMatch) return false;
+
+    // 2. 지역 필터링 (전국 공통 areaCd === 0 은 항상 노출)
+    if (selectedSido !== "0" && item.areaCd !== 0) {
+        if (String(item.areaCd) !== selectedSido) return false;
+    }
+    if (selectedSigungu !== "0" && item.areaCd !== 0) {
+        if (String(item.sigunguCd) !== selectedSigungu) return false;
+    }
+
+    // 3. 내 자격 조건 필터링
+    // 아이템 자체 자격 조건 검사
+    if (item.eligible && !userEligibility.includes(item.eligible)) {
+        return false;
+    }
+
+    // benefits 상세 목록이 존재하는 경우, 유효한(사용자 자격에 부합하는) 혜택이 최소 하나는 있는지 확인
+    if (item.benefits && item.benefits.length > 0) {
+        const pool = (window.BENEFITS_DATA && window.BENEFITS_DATA.__benefits_pool__) || [];
+        const hasAnyEligibleBenefit = item.benefits.some(b => {
+            let target = b;
+            if (typeof b === 'string') {
+                target = pool.find(x => x.name === b) || { name: b };
+            }
+            return !target.eligible || userEligibility.includes(target.eligible);
+        });
+        if (!hasAnyEligibleBenefit) return false;
+    }
+
+    return true;
+}
+
 function updateDashboard() {
     let totalMaxAmount = 0;
     let usedAmount = 0;
@@ -394,23 +432,17 @@ function updateDashboard() {
     // 활성화된 필터 조건에 부합하는 모든 혜택들의 금액 시뮬레이션 계산
     Object.values(benefitsData).forEach(dayItems => {
         dayItems.forEach(item => {
-            // 다중 필터 선택 시 OR(또는) 조건 및 교차 결합 지원
-            const isTypeMatch = activeFilters.length === 0 || activeFilters.some(f => (item.tags || []).includes(f));
-            let isAreaMatch = true;
-            if (selectedSido !== "0") {
-                // 주소 파싱으로 areaCd가 올바르게 재매핑되어 100% 보장됨
-                isAreaMatch = String(item.areaCd) === selectedSido;
-            }
-            if (selectedSigungu !== "0") {
-                isAreaMatch = String(item.sigunguCd) === selectedSigungu;
-            }
-
-            if (isTypeMatch && isAreaMatch && !item.isAd) {
+            if (isItemMatchingFilter(item)) {
                 // 1단계: benefits 배열이 있으면 각 상세 혜택별로 유니크하게 파싱하여 합산
                 if (item.benefits && item.benefits.length > 0) {
+                    const pool = (window.BENEFITS_DATA && window.BENEFITS_DATA.__benefits_pool__) || [];
                     item.benefits.forEach(b => {
-                        if (b.eligible && !userEligibility.includes(b.eligible)) return;
-                        const targetText = (b.name + " " + b.desc).replace(/,/g, '');
+                        let target = b;
+                        if (typeof b === 'string') {
+                            target = pool.find(x => x.name === b) || { name: b, desc: '' };
+                        }
+                        if (target.eligible && !userEligibility.includes(target.eligible)) return;
+                        const targetText = ((target.name || '') + " " + (target.desc || '')).replace(/,/g, '');
                         let parsedVal = 0;
 
                         // "20만원", "13만원" 등의 만원 패턴 매칭
@@ -427,19 +459,60 @@ function updateDashboard() {
                         }
 
                         if (parsedVal > 0) {
-                            if (usedBenefits.includes(b.name)) {
-                                if (!addedBenefits.has(b.name)) {
+                            const bName = target.name || b;
+                            if (usedBenefits.includes(bName)) {
+                                if (!addedBenefits.has(bName)) {
                                     usedAmount += parsedVal;
-                                    addedBenefits.add(b.name);
+                                    addedBenefits.add(bName);
                                 }
                             } else {
-                                if (!addedBenefits.has(b.name)) {
+                                if (!addedBenefits.has(bName)) {
                                     totalMaxAmount += parsedVal;
-                                    addedBenefits.add(b.name);
+                                    addedBenefits.add(bName);
                                 }
                             }
                         }
                     });
+                } else if (item.amount) {
+                    // 2단계: benefits가 없는 단독 혜택인 경우, 행사 타이틀 기준으로 중복을 체크해 합산
+                    const cleanAmountStr = item.amount.replace(/%/g, 'percent').replace(/,/g, '');
+                    let parsedVal = 0;
+
+                    const manwonMatch = cleanAmountStr.match(/(\d+)\s*만/);
+                    if (manwonMatch) {
+                        parsedVal = parseInt(manwonMatch[1]) * 10000;
+                    } else {
+                        const wonMatch = cleanAmountStr.match(/(\d+)\s*원/);
+                        if (wonMatch) {
+                            const val = parseInt(wonMatch[1]);
+                            if (val >= 1000) parsedVal = val;
+                        } else {
+                            // 단순 숫자 추출 백업
+                            const numbers = cleanAmountStr.match(/\d+/g);
+                            if (numbers) {
+                                const val = Math.max(...numbers.map(Number));
+                                if (val >= 1000) parsedVal = val;
+                            }
+                        }
+                    }
+
+                    if (parsedVal > 0) {
+                        if (usedBenefits.includes(item.title)) {
+                            if (!addedTitles.has(item.title)) {
+                                usedAmount += parsedVal;
+                                addedTitles.add(item.title);
+                            }
+                        } else {
+                            if (!addedTitles.has(item.title)) {
+                                totalMaxAmount += parsedVal;
+                                addedTitles.add(item.title);
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    });
                 } else if (item.amount) {
                     // 2단계: benefits가 없는 단독 혜택인 경우, 행사 타이틀 기준으로 중복을 체크해 합산
                     const cleanAmountStr = item.amount.replace(/%/g, 'percent').replace(/,/g, '');
@@ -725,25 +798,8 @@ function render() {
 
         const dayData = benefitsData[dateStr] || [];
         
-        // 1차 필터링: 태그(유형) 필터
-        let filtered = activeFilters.length === 0 
-            ? dayData 
-            : dayData.filter(item => activeFilters.some(f => (item.tags || []).includes(f)));
-
-        // 2차 필터링: 시/도 및 군/구 행정구역 다단계 필터링 적용
-        if (selectedSido !== "0") {
-            filtered = filtered.filter(item => {
-                // 전국 공통 배포 사업(areaCd = 0)은 어떤 지역을 골라도 상시 노출 적용
-                if (item.areaCd === 0) return true;
-                return String(item.areaCd) === selectedSido;
-            });
-        }
-        if (selectedSigungu !== "0") {
-            filtered = filtered.filter(item => {
-                if (item.areaCd === 0) return true;
-                return String(item.sigunguCd) === selectedSigungu;
-            });
-        }
+        // 통합 필터링 엔진 적용 (카테고리, 지역, 내 자격 교차 검증)
+        const filtered = dayData.filter(isItemMatchingFilter);
 
         if (filtered.length > 0) {
             // 혼잡도 정보를 바탕으로 하단 미니바 및 셀 배경색상 융합
@@ -813,8 +869,7 @@ function render() {
                 if (ADS_ENABLED && !rewardedThisSession) {
                     rewardTapCount++;
                     if (rewardTapCount >= rewardTapTarget) {
-                        tryShowRewardedAd();
-                        rewardedThisSession = true;
+                        tryShowRewardedAd(false);
                     }
                 }
             };
@@ -1245,7 +1300,7 @@ let rewardTapCount = 0;
 let rewardTapTarget = 0;
 function resetRewardTapTarget() {
     rewardTapCount = 0;
-    rewardTapTarget = Math.floor(Math.random() * 5) + 4;
+    rewardTapTarget = Math.floor(Math.random() * 3) + 3; // 3, 4, 5 중 랜덤
 }
 resetRewardTapTarget();
 const REWARDED_AD_ID = 'ait.v2.live.be0a965d07e0432b'; // 실제 상용 출시용 리워드 광고 ID
@@ -1268,7 +1323,7 @@ function preloadRewardedAd() {
     });
 }
 
-function tryShowRewardedAd() {
+function tryShowRewardedAd(isExitAd = false) {
     if (!rewardedAdLoaded || typeof showFullScreenAd === 'undefined' || !showFullScreenAd.isSupported()) {
         return false;
     }
@@ -1280,23 +1335,31 @@ function tryShowRewardedAd() {
                 case 'reward':
                     localStorage.setItem('rewardedOnExit', 'done');
                     addRewardPoints(1);
-                    // 광고 완료 후 즉시 종료 확인 모달 호출
-                    setTimeout(() => {
-                        showExitConfirmModal();
-                    }, 500);
+                    rewardedAdLoaded = false;
+                    resetRewardTapTarget();
+                    preloadRewardedAd();
+                    if (isExitAd) {
+                        setTimeout(() => { showExitConfirmModal(); }, 500);
+                    }
                     break;
                 case 'dismissed':
                 case 'failedToShow':
                     rewardedAdLoaded = false;
+                    resetRewardTapTarget();
                     preloadRewardedAd();
-                    // 광고 종료/실패 후 종료 확인 모달 호출
-                    showExitConfirmModal();
+                    if (isExitAd) {
+                        showExitConfirmModal();
+                    }
                     break;
             }
         },
         onError: () => {
             rewardedAdLoaded = false;
-            showExitConfirmModal();
+            resetRewardTapTarget();
+            preloadRewardedAd();
+            if (isExitAd) {
+                showExitConfirmModal();
+            }
         }
     });
     localStorage.setItem('rewardedOnExit', 'pending');

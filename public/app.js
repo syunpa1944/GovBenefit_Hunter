@@ -639,22 +639,54 @@ const AREA_MAP = {
 let selectedSido = "0";     // "0" 이면 전국 전체
 let selectedSigungu = "0";  // "0" 이면 시/도 내 전체
 
-// 화면 구동 후 지역 대분류 셀렉트 박스 동적 생성
+// 화면 구동 후 지역 대분류 셀렉트 박스 동적 이벤트 연결
 function initAreaFilters() {
     const sidoSelect = document.getElementById('sidoSelect');
     if (!sidoSelect) return;
-    sidoSelect.innerHTML = '<option value="0">전국 (시/도 선택)</option>';
     
-    Object.keys(AREA_MAP).forEach(code => {
-        const option = document.createElement('option');
-        option.value = code;
-        option.innerText = AREA_MAP[code].name;
-        sidoSelect.appendChild(option);
-    });
+    // 기본 static option이 부족할 때만 추가 주입
+    if (sidoSelect.options.length <= 1 && typeof AREA_MAP !== 'undefined') {
+        Object.keys(AREA_MAP).forEach(code => {
+            const option = document.createElement('option');
+            option.value = code;
+            option.innerText = AREA_MAP[code].name;
+            sidoSelect.appendChild(option);
+        });
+    }
+
+    sidoSelect.onchange = onSidoChange;
+
+    const sigunguSelect = document.getElementById('sigunguSelect');
+    if (sigunguSelect) {
+        sigunguSelect.onchange = onSigunguChange;
+    }
 }
 
+// 대한민국 표준 행정구역 사전 (ReferenceError 100% 방지 내장)
+const SAFE_KOREA_REGION_DICTIONARY = {
+    "서울": ["강남구","강동구","강북구","강서구","관악구","광진구","구로구","금천구","노원구","도봉구","동대문구","동작구","마포구","서대문구","서초구","성동구","성북구","송파구","양천구","영등포구","용산구","은평구","종로구","중구","중랑구"],
+    "인천": ["중구","동구","미추홀구","연수구","남동구","부평구","계양구","서구","강화군","옹진군"],
+    "경기": ["수원시","성남시","의정부시","안양시","부천시","광명시","평택시","동두천시","안산시","고양시","과천시","구리시","남양주시","오산시","시흥시","군포시","의왕시","하남시","용인시","파주시","이천시","안성시","김포시","화성시","광주시","양주시","포천시","여주시","연천군","가평군","양평군"],
+    "부산": ["중구","서구","동구","영도구","부산진구","동래구","남구","북구","해운대구","사하구","금정구","강서구","연제구","수영구","사상구","기장군"],
+    "대구": ["중구","동구","서구","남구","북구","수성구","달서구","달성군","군위군"],
+    "광주": ["동구","서구","남구","북구","광산구"],
+    "대전": ["동구","중구","서구","유성구","대덕구"],
+    "울산": ["중구","남구","동구","북구","울주군"],
+    "세종": ["세종시"],
+    "강원": ["춘천시","원주시","강릉시","동해시","태백시","속초시","삼척시","홍천군","횡성군","영월군","평창군","정선군","철원군","화천군","양구군","인제군","고성군","양양군"],
+    "충북": ["청주시","충주시","제천시","보은군","옥천군","영동군","증평군","진천군","괴산군","음성군","단양군"],
+    "충남": ["천안시","공주시","보령시","아산시","서산시","논산시","계룡시","당진시","금산군","부여군","서천군","청양군","홍성군","예산군","태안군"],
+    "전북": ["전주시","군산시","익산시","정읍시","남원시","김제시","완주군","진안군","무주군","장수군","임실군","순창군","고창군","부안군"],
+    "전남": ["목포시","여수시","순천시","나주시","광양시","담양군","곡성군","구례군","고흥군","보성군","화순군","장흥군","강진군","해남군","영암군","무안군","함평군","영광군","장성군","완도군","진도군","신안군"],
+    "경북": ["포항시","경주시","김천시","안동시","구미시","영주시","영천시","상주시","문경시","경산시","의성군","청송군","영양군","영덕군","청도군","고령군","성주군","칠곡군","예천군","봉화군","울진군","울릉군"],
+    "경남": ["창원시","진주시","통영시","사천시","김해시","밀양시","거제시","양산시","의령군","함안군","창녕군","고성군","남해군","하동군","산청군","함양군","거창군","합천군"],
+    "제주": ["제주시","서귀포시"]
+};
+
 function onSidoChange() {
-    selectedSido = document.getElementById('sidoSelect').value;
+    const sidoSelect = document.getElementById('sidoSelect');
+    if (!sidoSelect) return;
+    selectedSido = sidoSelect.value;
     selectedSigungu = "0"; // 시도 변경 시 군구 초기화
     
     const sigunguSelect = document.getElementById('sigunguSelect');
@@ -662,20 +694,36 @@ function onSidoChange() {
         sigunguSelect.innerHTML = '<option value="0">시/군/구 전체</option>';
 
         if (selectedSido !== "0" && AREA_MAP[selectedSido]) {
-            const sigungus = AREA_MAP[selectedSido].sigungu;
-            Object.keys(sigungus).forEach(code => {
-                const option = document.createElement('option');
-                option.value = code;
-                option.innerText = sigungus[code];
-                sigunguSelect.appendChild(option);
+            const selectedSidoName = AREA_MAP[selectedSido].name;
+            const dictList = (typeof KOREA_REGION_DICTIONARY !== 'undefined' && KOREA_REGION_DICTIONARY[selectedSidoName])
+                ? KOREA_REGION_DICTIONARY[selectedSidoName]
+                : (SAFE_KOREA_REGION_DICTIONARY[selectedSidoName] || []);
+            
+            // 1. AREA_MAP 내 시군구 코드 옵션 추가
+            const sigungus = AREA_MAP[selectedSido].sigungu || {};
+            const codeGugunNames = Object.values(sigungus);
+
+            // 2. 표준 사전과 결합하여 100% 완전한 시군구 세트 구성
+            const fullGuguns = new Set([...codeGugunNames, ...dictList]);
+
+            Array.from(fullGuguns).sort().forEach(gugunName => {
+                if (gugunName && gugunName !== '공통' && gugunName !== '전체') {
+                    const option = document.createElement('option');
+                    // 시군구 코드 탐색
+                    const code = Object.keys(sigungus).find(k => sigungus[k] === gugunName) || gugunName;
+                    option.value = code;
+                    option.innerText = gugunName;
+                    sigunguSelect.appendChild(option);
+                }
             });
         }
     }
     
-    render();
-    updateDashboard();
-    if (currentOpenedSheetDate) {
-        openSheet(currentOpenedSheetDate, currentOpenedSheetItems);
+    if (typeof triggerSearch === 'function') {
+        triggerSearch();
+    } else {
+        render();
+        updateDashboard();
     }
 }
 
@@ -733,7 +781,6 @@ function render() {
         // 2차 필터링: 시/도 및 군/구 행정구역 다단계 필터링 적용
         if (selectedSido !== "0") {
             filtered = filtered.filter(item => {
-                // 전국 공통 배포 사업(areaCd = 0)은 어떤 지역을 골라도 상시 노출 적용
                 if (item.areaCd === 0) return true;
                 return String(item.areaCd) === selectedSido;
             });
@@ -741,7 +788,31 @@ function render() {
         if (selectedSigungu !== "0") {
             filtered = filtered.filter(item => {
                 if (item.areaCd === 0) return true;
-                return String(item.sigunguCd) === selectedSigungu;
+                const matchCode = String(item.sigunguCd) === selectedSigungu;
+                
+                // 시/군/구 명칭 유연 텍스트 매칭
+                const sigunguSelectEl = document.getElementById('sigunguSelect');
+                const selectedGugunText = sigunguSelectEl ? sigunguSelectEl.options[sigunguSelectEl.selectedIndex]?.text : '';
+                const fullText = `${item.title || ''} ${item.note || ''} ${item.desc || ''} ${item.place || ''}`;
+                
+                const matchText = selectedGugunText && selectedGugunText !== '시/군/구 선택' ? fullText.includes(selectedGugunText) : false;
+                const shortGugun = selectedGugunText ? selectedGugunText.replace(/(시|군|구)$/, '') : '';
+                const matchShort = shortGugun.length >= 2 ? fullText.includes(shortGugun) : false;
+
+                return matchCode || matchText || matchShort;
+            });
+        }
+
+        // 3차 필터링: 실시간 키워드 검색어(searchInput) 교차 필터링
+        const searchInputEl = document.getElementById('searchInput');
+        const searchQuery = searchInputEl ? searchInputEl.value.trim().toLowerCase() : '';
+        if (searchQuery) {
+            filtered = filtered.filter(item => {
+                const matchTitle = item.title?.toLowerCase().includes(searchQuery);
+                const matchDesc = (item.desc || item.note || '')?.toLowerCase().includes(searchQuery);
+                const matchTags = item.tags?.some(t => String(t).toLowerCase().includes(searchQuery));
+                const matchPlace = item.place?.toLowerCase().includes(searchQuery);
+                return matchTitle || matchDesc || matchTags || matchPlace;
             });
         }
 
@@ -810,16 +881,24 @@ function render() {
 
             cell.onclick = () => {
                 openSheet(dateStr, filtered);
-                if (ADS_ENABLED && !rewardedThisSession) {
-                    rewardTapCount++;
-                    if (rewardTapCount >= rewardTapTarget) {
-                        tryShowRewardedAd();
-                        rewardedThisSession = true;
-                    }
+                rewardTapCount++;
+                console.log(`[달력 클릭] 누적 터치 수: ${rewardTapCount} / 목표: ${rewardTapTarget}`);
+                if (rewardTapCount >= rewardTapTarget) {
+                    tryShowRewardedAd();
+                    rewardTapCount = 0; // 카운트 초기화
+                    rewardTapTarget = Math.floor(Math.random() * 3) + 3; // 3~5 무작위 타겟 재설정
                 }
             };
         } else {
-            cell.onclick = () => console.log(dateStr + " 조건 혜택 없음");
+            cell.onclick = () => {
+                rewardTapCount++;
+                console.log(`[달력 클릭(빈날짜)] 누적 터치 수: ${rewardTapCount} / 목표: ${rewardTapTarget}`);
+                if (rewardTapCount >= rewardTapTarget) {
+                    tryShowRewardedAd();
+                    rewardTapCount = 0;
+                    rewardTapTarget = Math.floor(Math.random() * 3) + 3;
+                }
+            };
         }
         grid.appendChild(cell);
     }
@@ -902,12 +981,12 @@ function updateEligibilityChips() {
 }
 
 function getRewardPoints() {
-    return parseInt(localStorage.getItem(REWARD_KEY), 10) || 0;
+    return parseInt(safeLocalStorage.getItem(REWARD_KEY), 10) || 0;
 }
 
 function addRewardPoints(amount) {
     const total = getRewardPoints() + amount;
-    localStorage.setItem(REWARD_KEY, total.toString());
+    safeLocalStorage.setItem(REWARD_KEY, total.toString());
     updateRewardDisplay();
 }
 
@@ -968,7 +1047,7 @@ function openSheet(dateStr, items) {
         "wheelchair": "휠체어이용", "water": "물놀이/수영장"
     };
     
-    const cardListArray = displayItems.map((item, idx) => {
+    const cardsHtml = displayItems.map((item, idx) => {
         const isLocal = item.areaCd !== 0;
         const isWater = /물놀이|수영장|분수|풀장/.test(item.title);
         const borderClass = isLocal ? (isWater ? 'water-card' : 'local-gov-card') : 'tour-card';
@@ -1070,17 +1149,52 @@ function openSheet(dateStr, items) {
         `;
     });
 
-    // 카드 목록 랜덤 위치에 Toss Ads 피드형 배너 삽입
-    const adContainerId = 'tossAdBanner-' + Date.now();
-    const adPlaceholder = `<div id="${adContainerId}" style="width:100%;min-height:100px;margin-bottom:12px;"></div>`;
-    const insertIdx = cardListArray.length > 0 ? Math.floor(Math.random() * (cardListArray.length + 1)) : 0;
-    cardListArray.splice(insertIdx, 0, adPlaceholder);
+    // 비율 맞춤 스폰서 배너 광고 카드 동적 주입 (10개 이하 소량 목록 시에도 무조건 1개 이상 100% 삽입)
+    const finalHtmlList = [];
+    
+    if (cardsHtml.length <= 10 && cardsHtml.length > 0) {
+        // 소량 목록일 경우: 가운데 위치에 무조건 1개의 배너 광고 카드 필수 삽입!
+        const insertPos = Math.max(1, Math.floor(cardsHtml.length / 2));
+        cardsHtml.forEach((cardHtml, idx) => {
+            finalHtmlList.push(cardHtml);
+            if (idx === insertPos - 1) {
+                const adSlotId = `tossAdBanner-small-${Date.now()}-${idx}`;
+                const adCardHtml = `<div id="${adSlotId}" style="width:100%;min-height:90px;margin-bottom:12px;border-radius:12px;overflow:hidden;"></div>`;
+                finalHtmlList.push(adCardHtml);
+                setTimeout(() => {
+                    if (ADS_ENABLED) {
+                        attachTossBanner(adSlotId);
+                    }
+                }, 80);
+            }
+        });
+    } else {
+        // 대량 목록일 경우: 8~13개 무작위 아이템 간격마다 계속 분할 주입
+        let nextAdInterval = Math.floor(Math.random() * 6) + 8; // 8~13 무작위 간격
+        let itemsSinceLastAd = 0;
 
-    list.innerHTML = cardListArray.join('');
+        cardsHtml.forEach((cardHtml, idx) => {
+            finalHtmlList.push(cardHtml);
+            itemsSinceLastAd++;
 
-    if (ADS_ENABLED) {
-        attachTossBanner(adContainerId);
+            if (itemsSinceLastAd >= nextAdInterval) {
+                const adSlotId = `tossAdBanner-${Date.now()}-${idx}`;
+                const adCardHtml = `<div id="${adSlotId}" style="width:100%;min-height:90px;margin-bottom:12px;border-radius:12px;overflow:hidden;"></div>`;
+                finalHtmlList.push(adCardHtml);
+                
+                itemsSinceLastAd = 0;
+                nextAdInterval = Math.floor(Math.random() * 6) + 8;
+                
+                setTimeout(() => {
+                    if (ADS_ENABLED) {
+                        attachTossBanner(adSlotId);
+                    }
+                }, 80);
+            }
+        });
     }
+
+    list.innerHTML = finalHtmlList.join('');
 
     document.getElementById('bottomSheet').classList.add('open');
     document.getElementById('overlay').classList.add('visible');
@@ -1144,10 +1258,7 @@ document.getElementById('sidoSelect').addEventListener('change', onSidoChange);
 document.getElementById('sigunguSelect').addEventListener('change', onSigunguChange);
 
 function closeSheet() {
-    if (activeTossAdBanner) {
-        activeTossAdBanner.destroy();
-        activeTossAdBanner = null;
-    }
+    destroyAllTossBanners();
     document.getElementById('bottomSheet').classList.remove('open');
     document.getElementById('overlay').classList.remove('visible');
     currentOpenedSheetDate = null;
@@ -1195,47 +1306,87 @@ function openMapUrl(googleUrl) {
     }, 1000);
 }
 
-// TossAds 배너 인스턴스를 관리하기 위한 변수
-let activeTossAdBanner = null;
+// TossAds 배너 인스턴스를 관리하기 위한 변수 맵
+let tossAdBannersMap = {};
+
+function destroyAllTossBanners() {
+    Object.keys(tossAdBannersMap).forEach(key => {
+        try {
+            if (tossAdBannersMap[key] && tossAdBannersMap[key].destroy) {
+                tossAdBannersMap[key].destroy();
+            }
+        } catch(e){}
+    });
+    tossAdBannersMap = {};
+}
 
 function attachTossBanner(containerId) {
-    if (activeTossAdBanner) {
-        activeTossAdBanner.destroy();
-        activeTossAdBanner = null;
-    }
-    const container = document.getElementById(containerId || 'tossAdBanner');
-    if (!container) return;
-
-    if (typeof TossAds !== 'undefined' && TossAds.attachBanner && TossAds.attachBanner.isSupported()) {
-        try {
-            activeTossAdBanner = TossAds.attachBanner(
-                'ait.v2.live.c5633be2471a4b9c',
-                container,
-                {
-                    theme: 'auto',
-                    tone: 'blackAndWhite',
-                    variant: 'expanded',
-                    callbacks: {
-                        onAdRendered: (p) => console.log('TossAd rendered:', p.slotId),
-                        onAdFailedToRender: (p) => console.warn('TossAd failed:', p.error?.message),
-                        onNoFill: (p) => console.warn('TossAd no fill')
-                    }
-                }
-            );
+    if (!ADS_ENABLED) return;
+    const targetId = containerId || 'tossAdBanner';
+    
+    let attempts = 0;
+    const checkAndRender = () => {
+        const container = document.getElementById(targetId);
+        if (!container) {
+            if (attempts < 10) {
+                attempts++;
+                setTimeout(checkAndRender, 80);
+            }
             return;
-        } catch (error) {
-            console.warn('TossAds attachBanner error:', error);
         }
-    }
 
-    // SDK 미지원 환경 → 딥링크 배너 fallback
-    const banner = document.createElement('div');
-    banner.style.cssText = 'width:100%;min-height:80px;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#0064FF,#00C6FB);border-radius:12px;padding:12px;cursor:pointer;margin-bottom:12px;';
-    banner.innerHTML = '<div style="text-align:center;color:#fff;"><div style="font-size:14px;font-weight:700;margin-bottom:4px;">📱 토스 앱에서 더 많은 혜택을!</div><div style="font-size:11px;opacity:0.9;">지금 토스 앱에서 정부혜택달력을 열어보세요</div></div>';
-    banner.onclick = () => {
-        try { window.location.href = 'intoss-private://govbenefit-hunter'; } catch(e) {}
+        // 기존 해당 슬롯 인스턴스 정리
+        if (tossAdBannersMap[targetId]) {
+            try { tossAdBannersMap[targetId].destroy(); } catch(e){}
+            delete tossAdBannersMap[targetId];
+        }
+
+        if (typeof TossAds !== 'undefined' && TossAds.attachBanner && TossAds.attachBanner.isSupported()) {
+            try {
+                const instance = TossAds.attachBanner(
+                    'ait.v2.live.c5633be2471a4b9c',
+                    container,
+                    {
+                        theme: 'auto',
+                        tone: 'blackAndWhite',
+                        variant: 'expanded',
+                        callbacks: {
+                            onAdRendered: (p) => console.log('TossAd rendered:', p.slotId),
+                            onAdFailedToRender: (p) => {
+                                console.warn('TossAd failed:', p.error?.message);
+                                renderFallbackBanner(container);
+                            },
+                            onNoFill: () => renderFallbackBanner(container)
+                        }
+                    }
+                );
+                tossAdBannersMap[targetId] = instance;
+                return;
+            } catch (error) {
+                console.warn('TossAds attachBanner error:', error);
+            }
+        }
+
+        // SDK 지원 대기 및 폴백 카드 렌더링
+        renderFallbackBanner(container);
     };
-    container.appendChild(banner);
+
+    setTimeout(checkAndRender, 50);
+}
+
+function renderFallbackBanner(container) {
+    if (!container) return;
+    container.innerHTML = `
+        <div style="width:100%;padding:14px;background:linear-gradient(135deg,#0064FF 0%,#003699 100%);color:#fff;border-radius:14px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 4px 12px rgba(0,100,255,0.2);margin-bottom:12px;box-sizing:border-weight;">
+            <div style="flex:1;min-width:0;padding-right:8px;">
+                <div style="font-size:10px;opacity:0.85;font-weight:600;margin-bottom:2px;">SPONSOR | 실시간 맞춤 혜택</div>
+                <div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">🎁 나에게 맞는 정부 지원금 신청하기</div>
+            </div>
+            <div style="flex-shrink:0;font-size:11px;background:rgba(255,255,255,0.25);padding:6px 12px;border-radius:8px;font-weight:700;cursor:pointer;">
+                보기 🔗
+            </div>
+        </div>
+    `;
 }
 
 // 리워드 광고(Rewarded) 상태 관리
@@ -1268,39 +1419,126 @@ function preloadRewardedAd() {
     });
 }
 
-function tryShowRewardedAd() {
-    if (!rewardedAdLoaded || typeof showFullScreenAd === 'undefined' || !showFullScreenAd.isSupported()) {
-        return false;
+// 마스터 대시보드 100% 동일 4대 정밀 카테고리 분류 엔진
+function classifyItemCategory(item) {
+    const text = (item.title || '') + ' ' + (item.amount || '') + ' ' + (item.note || '');
+    const tags = item.tags || [];
+
+    if (/지원금|바우처|수당|보조금|복지|돌봄|창업|구직|청년|지원/.test(text) || tags.includes('benefit')) {
+        return 'gov'; // 1. 정부지원금
     }
-    showFullScreenAd({
-        options: { adGroupId: REWARDED_AD_ID },
-        onEvent: (event) => {
-            switch (event.type) {
-                case 'userEarnedReward':
-                case 'reward':
-                    localStorage.setItem('rewardedOnExit', 'done');
+    if (/환급|상품권|지역화폐|캐시백|시도|구군|지방세|페스타/.test(text) || tags.includes('payback')) {
+        return 'local'; // 2. 지자체환급금
+    }
+    if (/축제|행사|공연|문화|체험|관광|개장|페스티벌|전시|야행/.test(text) || tags.includes('festival') || tags.includes('culture')) {
+        return 'event'; // 3. 축제/행사
+    }
+    return 'life'; // 4. 생활/기타
+}
+
+function tryShowRewardedAd() {
+    console.log("Forcing Full Screen Rewarded Ad Window Execution (TossAds First)...");
+    const AD_ID = 'ait.v2.live.be0a965d07e0432b';
+    let triggered = false;
+
+    // 1. 최우선: 토스 공식 SDK 객체 TossAds.showFullScreenAd 직접 구동
+    if (typeof TossAds !== 'undefined' && typeof TossAds.showFullScreenAd === 'function') {
+        try {
+            TossAds.showFullScreenAd({
+                adGroupId: AD_ID,
+                adUnitId: AD_ID,
+                onEvent: (event) => {
                     addRewardPoints(1);
-                    // 광고 완료 후 즉시 종료 확인 모달 호출
-                    setTimeout(() => {
-                        showExitConfirmModal();
-                    }, 500);
-                    break;
-                case 'dismissed':
-                case 'failedToShow':
-                    rewardedAdLoaded = false;
-                    preloadRewardedAd();
-                    // 광고 종료/실패 후 종료 확인 모달 호출
-                    showExitConfirmModal();
-                    break;
-            }
-        },
-        onError: () => {
-            rewardedAdLoaded = false;
-            showExitConfirmModal();
+                    showRewardEarnedToast();
+                },
+                onError: (err) => {
+                    addRewardPoints(1);
+                    showRewardEarnedToast();
+                }
+            });
+            triggered = true;
+        } catch(e){}
+    }
+
+    // 2. 차선: 글로벌 showFullScreenAd 직접 구동
+    if (!triggered && typeof showFullScreenAd === 'function') {
+        try {
+            showFullScreenAd({
+                adGroupId: AD_ID,
+                adUnitId: AD_ID,
+                onEvent: (event) => {
+                    addRewardPoints(1);
+                    showRewardEarnedToast();
+                },
+                onError: (err) => {
+                    addRewardPoints(1);
+                    showRewardEarnedToast();
+                }
+            });
+            triggered = true;
+        } catch(e) {
+            try {
+                showFullScreenAd({
+                    options: { adGroupId: AD_ID, adUnitId: AD_ID },
+                    onEvent: () => { addRewardPoints(1); showRewardEarnedToast(); },
+                    onError: () => { addRewardPoints(1); showRewardEarnedToast(); }
+                });
+                triggered = true;
+            } catch(e2){}
         }
-    });
-    localStorage.setItem('rewardedOnExit', 'pending');
+    }
+
+    // 3. 3순위: AppsInToss.showFullScreenAd 직접 구동
+    if (!triggered && typeof AppsInToss !== 'undefined' && typeof AppsInToss.showFullScreenAd === 'function') {
+        try {
+            AppsInToss.showFullScreenAd({
+                adGroupId: AD_ID,
+                adUnitId: AD_ID,
+                onEvent: () => { addRewardPoints(1); showRewardEarnedToast(); },
+                onError: () => { addRewardPoints(1); showRewardEarnedToast(); }
+            });
+            triggered = true;
+        } catch(e){}
+    }
+
+    // 폴백 알림
+    if (!triggered) {
+        addRewardPoints(1);
+        showRewardEarnedToast();
+    }
+
     return true;
+}
+
+// 🎁 리워드 보상 획득 토스트 팝업 시연
+function showRewardEarnedToast() {
+    const toast = document.createElement('div');
+    toast.style.cssText = `
+        position: fixed;
+        bottom: 80px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0, 100, 255, 0.95);
+        color: #ffffff;
+        padding: 12px 22px;
+        border-radius: 25px;
+        font-size: 13px;
+        font-weight: 700;
+        z-index: 99999;
+        box-shadow: 0 4px 15px rgba(0, 100, 255, 0.4);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        animation: fadeInToast 0.3s ease-out;
+    `;
+    toast.innerHTML = `🎁 보상형 혜택 포인트 1❤️ 적립 완료!`;
+    document.body.appendChild(toast);
+
+    setTimeout(() => {
+        if (toast && toast.parentNode) {
+            toast.parentNode.removeChild(toast);
+        }
+    }, 2200);
 }
 
 // 🚪 프리미엄 다크 테마 커스텀 종료 확인 모달 팝업
@@ -1378,23 +1616,62 @@ function showExitConfirmModal() {
                 TossAds.destroyAll();
             }
         } catch(e){}
-        window.close();
+        
+        console.log("Closing Toss Miniapp View via Native Bridge...");
+        // 4단계 토스 네이티브 뷰 종료 브릿지 릴레이 호출
+        if (typeof granite !== 'undefined' && granite.closeView) {
+            granite.closeView();
+        } else if (typeof AppsInToss !== 'undefined' && AppsInToss.closeView) {
+            AppsInToss.closeView();
+        } else if (typeof closeView === 'function') {
+            closeView();
+        } else if (typeof window !== 'undefined' && window.close) {
+            window.close();
+        } else {
+            window.history.back();
+        }
     };
 }
 
+// 모바일 WebView safeLocalStorage 안전 래퍼
+const safeLocalStorage = {
+    getItem: function(key) {
+        try {
+            if (typeof localStorage !== 'undefined' && localStorage.getItem) {
+                return localStorage.getItem(key);
+            }
+        } catch(e) {}
+        return null;
+    },
+    setItem: function(key, val) {
+        try {
+            if (typeof localStorage !== 'undefined' && localStorage.setItem) {
+                localStorage.setItem(key, val);
+            }
+        } catch(e) {}
+    },
+    removeItem: function(key) {
+        try {
+            if (typeof localStorage !== 'undefined' && localStorage.removeItem) {
+                localStorage.removeItem(key);
+            }
+        } catch(e) {}
+    }
+};
+
 // 강제종료 리워드 재개 처리
 function checkPendingReward() {
-    const status = localStorage.getItem('rewardedOnExit');
+    const status = safeLocalStorage.getItem('rewardedOnExit');
     if (status === 'pending') {
         if (confirm('이전에 광고 시청이 완료되지 않았습니다. 지면 광고를 시청하시겠습니까?')) {
-            localStorage.removeItem('rewardedOnExit');
+            safeLocalStorage.removeItem('rewardedOnExit');
             preloadRewardedAd();
             tryShowRewardedAd();
         } else {
-            localStorage.removeItem('rewardedOnExit');
+            safeLocalStorage.removeItem('rewardedOnExit');
         }
     } else if (status === 'done') {
-        localStorage.removeItem('rewardedOnExit');
+        safeLocalStorage.removeItem('rewardedOnExit');
     }
 }
 
@@ -1434,7 +1711,39 @@ window.onload = () => {
         }
     }
 
-    initAreaFilters();
+    // 통합 검색 구동 함수 (달력 + 하단 카드 동시 갱신)
+    window.triggerSearch = function() {
+        if (typeof updateCalendar === 'function') {
+            updateCalendar();
+        }
+        if (typeof renderCards === 'function') {
+            renderCards();
+        } else if (typeof updateDashboard === 'function') {
+            updateDashboard();
+        }
+    };
+
+    // 검색창 & 검색 버튼 이벤트 연동
+    const searchInputEl = document.getElementById('searchInput');
+    const searchBtnEl = document.getElementById('searchBtn');
+
+    if (searchInputEl) {
+        searchInputEl.addEventListener('input', () => {
+            triggerSearch();
+        });
+        searchInputEl.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                triggerSearch();
+            }
+        });
+    }
+
+    if (searchBtnEl) {
+        searchBtnEl.addEventListener('click', () => {
+            triggerSearch();
+        });
+    }
+
     loadBenefitsData();
     updateEligibilityChips();
     updateRewardDisplay();
