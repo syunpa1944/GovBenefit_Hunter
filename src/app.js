@@ -406,6 +406,9 @@ function updateDashboard() {
             }
 
             if (isTypeMatch && isAreaMatch && !item.isAd) {
+                // 0단계: 아이템 자체 자격 조건 검사
+                if (item.eligible && !userEligibility.includes(item.eligible)) return;
+
                 // 1단계: benefits 배열이 있으면 각 상세 혜택별로 유니크하게 파싱하여 합산
                 if (item.benefits && item.benefits.length > 0) {
                     item.benefits.forEach(b => {
@@ -728,6 +731,13 @@ function onSigunguChange() {
     if (sigunguSelect) {
         selectedSigungu = sigunguSelect.value;
     }
+    render();
+    updateDashboard();
+    if (currentOpenedSheetDate) {
+        openSheet(currentOpenedSheetDate, currentOpenedSheetItems);
+    }
+}
+
 function render() {
     const year = currentYear;
     const month = currentMonth;
@@ -779,6 +789,25 @@ function render() {
             filtered = filtered.filter(item => {
                 if (item.areaCd === 0) return true;
                 return String(item.sigunguCd) === selectedSigungu;
+            });
+        }
+
+        // 3차 필터링: 사용자 자격 조건 필터링
+        if (userEligibility.length > 0) {
+            filtered = filtered.filter(item => {
+                if (item.eligible && !userEligibility.includes(item.eligible)) return false;
+                if (item.benefits && item.benefits.length > 0) {
+                    const pool = (window.BENEFITS_DATA && window.BENEFITS_DATA.__benefits_pool__) || [];
+                    const hasAnyEligibleBenefit = item.benefits.some(b => {
+                        let target = b;
+                        if (typeof b === 'string') {
+                            target = pool.find(x => x.name === b) || { name: b };
+                        }
+                        return !target.eligible || userEligibility.includes(target.eligible);
+                    });
+                    if (!hasAnyEligibleBenefit) return false;
+                }
+                return true;
             });
         }
 
@@ -963,6 +992,8 @@ function changeMonth(step) {
     if (currentMonth < 0) { currentMonth = 11; currentYear--; }
     else if (currentMonth > 11) { currentMonth = 0; currentYear++; }
     render();
+}
+
 function openSheet(dateStr, items) {
     currentOpenedSheetDate = dateStr;
     currentOpenedSheetItems = items;
@@ -998,13 +1029,28 @@ function openSheet(dateStr, items) {
         return true;
     });
 
-    const cardsHtml = displayItems.map((item, idx) => {
-        const isLocal = true;
+    const tagTranslation = {
+        "benefit": "정부지원금", "payback": "지자체환급", "free": "무료입장",
+        "festival": "축제/공연/행사", "eco": "생태관광", "barrier": "무장애여행",
+        "pet": "반려동물동반", "camp": "야영장", "stroller": "유모차반입",
+        "wheelchair": "휠체어이용", "water": "물놀이/수영장"
+    };
+
+    const cardListArray = displayItems.map((item, idx) => {
+        const isLocal = item.areaCd !== 0;
+        const isWater = /물놀이|수영장|분수|풀장/.test(item.title);
+        const borderClass = isLocal ? (isWater ? 'water-card' : 'local-gov-card') : 'tour-card';
         const mainLink = item.link || "";
         const tags = item.tags || [];
-        const regionLabel = (item.sigunguNm && item.sigunguNm !== '전체') ? item.sigunguNm : (item.sidoNm || '전국');
-        const borderClass = (item.congestion === 'red') ? 'border-red' : (item.congestion === 'yellow' ? 'border-yellow' : 'border-green');
-        const typeEmoji = tags.includes('festival') ? '🎉' : (tags.includes('water') ? '🌊' : '✨');
+        const regionLabel = (item.areaNm || '전국') + (item.sigunguNm ? ' ' + item.sigunguNm : '');
+        const typeEmoji = tags.includes('water') ? '🌊'
+            : tags.includes('festival') ? '🎉'
+            : tags.includes('barrier') ? '♿'
+            : tags.includes('pet') ? '🐶'
+            : tags.includes('camp') ? '🏕️'
+            : tags.includes('free') ? '🎫'
+            : tags.includes('benefit') ? '💸'
+            : '✨';
 
         let mapEmbedHtml = '';
         if (item.mapUrl) {
