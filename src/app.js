@@ -847,24 +847,21 @@ function render() {
 
             cell.onclick = () => {
                 openSheet(dateStr, filtered);
-                rewardTapCount++;
-                console.log(`[달력 터치] 누적: ${rewardTapCount} / 목표: ${rewardTapTarget}`);
-                if (rewardTapCount >= rewardTapTarget) {
-                    tryShowRewardedAd();
-                    rewardTapCount = 0;
-                    rewardTapTarget = Math.floor(Math.random() * 3) + 3;
+                if (ADS_ENABLED) {
+                    rewardTapCount++;
+                    if (rewardTapCount >= rewardTapTarget) {
+                        if (tryShowRewardedAd()) {
+                            resetRewardTapTarget();
+                            preloadRewardedAd();
+                        } else {
+                            resetRewardTapTarget();
+                            preloadRewardedAd();
+                        }
+                    }
                 }
             };
         } else {
-            cell.onclick = () => {
-                rewardTapCount++;
-                console.log(`[달력 터치(빈날짜)] 누적: ${rewardTapCount} / 목표: ${rewardTapTarget}`);
-                if (rewardTapCount >= rewardTapTarget) {
-                    tryShowRewardedAd();
-                    rewardTapCount = 0;
-                    rewardTapTarget = Math.floor(Math.random() * 3) + 3;
-                }
-            };
+            cell.onclick = () => console.log(dateStr + " 조건 혜택 없음");
         }
         grid.appendChild(cell);
     }
@@ -1354,72 +1351,37 @@ function classifyItemCategory(item) {
 }
 
 function tryShowRewardedAd() {
-    console.log("Forcing Full Screen Rewarded Ad Window Execution (TossAds First)...");
-    const AD_ID = 'ait.v2.live.be0a965d07e0432b';
-    let triggered = false;
-
-    if (typeof TossAds !== 'undefined' && typeof TossAds.showFullScreenAd === 'function') {
-        try {
-            TossAds.showFullScreenAd({
-                adGroupId: AD_ID,
-                adUnitId: AD_ID,
-                onEvent: (event) => {
-                    addRewardPoints(1);
-                    showRewardEarnedToast();
-                },
-                onError: (err) => {
-                    addRewardPoints(1);
-                    showRewardEarnedToast();
-                }
-            });
-            triggered = true;
-        } catch(e){}
+    if (!rewardedAdLoaded || typeof showFullScreenAd === 'undefined' || !showFullScreenAd.isSupported()) {
+        return false;
     }
-
-    if (!triggered && typeof showFullScreenAd === 'function') {
-        try {
-            showFullScreenAd({
-                adGroupId: AD_ID,
-                adUnitId: AD_ID,
-                onEvent: (event) => {
+    showFullScreenAd({
+        options: { adGroupId: REWARDED_AD_ID },
+        onEvent: (event) => {
+            switch (event.type) {
+                case 'userEarnedReward':
+                case 'reward':
+                    localStorage.setItem('rewardedOnExit', 'done');
                     addRewardPoints(1);
-                    showRewardEarnedToast();
-                },
-                onError: (err) => {
-                    addRewardPoints(1);
-                    showRewardEarnedToast();
-                }
-            });
-            triggered = true;
-        } catch(e) {
-            try {
-                showFullScreenAd({
-                    options: { adGroupId: AD_ID, adUnitId: AD_ID },
-                    onEvent: () => { addRewardPoints(1); showRewardEarnedToast(); },
-                    onError: () => { addRewardPoints(1); showRewardEarnedToast(); }
-                });
-                triggered = true;
-            } catch(e2){}
+                    // 광고 완료 후 즉시 종료 확인 모달 호출
+                    setTimeout(() => {
+                        showExitConfirmModal();
+                    }, 500);
+                    break;
+                case 'dismissed':
+                case 'failedToShow':
+                    rewardedAdLoaded = false;
+                    preloadRewardedAd();
+                    // 광고 종료/실패 후 종료 확인 모달 호출
+                    showExitConfirmModal();
+                    break;
+            }
+        },
+        onError: () => {
+            rewardedAdLoaded = false;
+            showExitConfirmModal();
         }
-    }
-
-    if (!triggered && typeof AppsInToss !== 'undefined' && typeof AppsInToss.showFullScreenAd === 'function') {
-        try {
-            AppsInToss.showFullScreenAd({
-                adGroupId: AD_ID,
-                adUnitId: AD_ID,
-                onEvent: () => { addRewardPoints(1); showRewardEarnedToast(); },
-                onError: () => { addRewardPoints(1); showRewardEarnedToast(); }
-            });
-            triggered = true;
-        } catch(e){}
-    }
-
-    if (!triggered) {
-        addRewardPoints(1);
-        showRewardEarnedToast();
-    }
-
+    });
+    localStorage.setItem('rewardedOnExit', 'pending');
     return true;
 }
 
