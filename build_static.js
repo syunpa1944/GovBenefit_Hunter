@@ -95,6 +95,7 @@ const publicDir = path.join(ROOT, 'public');
 if (fs.existsSync(publicDir) && fs.statSync(publicDir).isDirectory()) {
     const files = fs.readdirSync(publicDir);
     files.forEach(f => {
+        if (f === 'app.js') return; // src/app.js로 정제된 최신 비즈니스/광고 로직 덮어쓰기 방지
         const src = path.join(publicDir, f);
         if (fs.statSync(src).isFile()) {
             fs.copyFileSync(src, path.join(DIST_WEB, f));
