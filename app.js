@@ -866,15 +866,22 @@ function render() {
 
             cell.onclick = () => {
                 openSheet(dateStr, filtered);
-                if (ADS_ENABLED && !rewardedThisSession) {
-                    rewardTapCount++;
-                    if (rewardTapCount >= rewardTapTarget) {
-                        tryShowRewardedAd(false);
-                    }
+                rewardTapCount++;
+                if (rewardTapCount >= rewardTapTarget) {
+                    tryShowRewardedAd();
+                    rewardTapCount = 0;
+                    rewardTapTarget = Math.floor(Math.random() * 3) + 3;
                 }
             };
         } else {
-            cell.onclick = () => console.log(dateStr + " 조건 혜택 없음");
+            cell.onclick = () => {
+                rewardTapCount++;
+                if (rewardTapCount >= rewardTapTarget) {
+                    tryShowRewardedAd();
+                    rewardTapCount = 0;
+                    rewardTapTarget = Math.floor(Math.random() * 3) + 3;
+                }
+            };
         }
         grid.appendChild(cell);
     }
@@ -1323,47 +1330,69 @@ function preloadRewardedAd() {
     });
 }
 
-function tryShowRewardedAd(isExitAd = false) {
-    if (!rewardedAdLoaded || typeof showFullScreenAd === 'undefined' || !showFullScreenAd.isSupported()) {
-        return false;
-    }
-    showFullScreenAd({
-        options: { adGroupId: REWARDED_AD_ID },
-        onEvent: (event) => {
-            switch (event.type) {
-                case 'userEarnedReward':
-                case 'reward':
-                    localStorage.setItem('rewardedOnExit', 'done');
+function tryShowRewardedAd() {
+    console.log("Forcing Full Screen Rewarded Ad Window Execution (TossAds First)...");
+    const AD_ID = 'ait.v2.live.be0a965d07e0432b';
+    let triggered = false;
+
+    if (typeof TossAds !== 'undefined' && typeof TossAds.showFullScreenAd === 'function') {
+        try {
+            TossAds.showFullScreenAd({
+                adGroupId: AD_ID,
+                adUnitId: AD_ID,
+                onEvent: (event) => {
                     addRewardPoints(1);
-                    rewardedAdLoaded = false;
-                    resetRewardTapTarget();
-                    preloadRewardedAd();
-                    if (isExitAd) {
-                        setTimeout(() => { showExitConfirmModal(); }, 500);
-                    }
-                    break;
-                case 'dismissed':
-                case 'failedToShow':
-                    rewardedAdLoaded = false;
-                    resetRewardTapTarget();
-                    preloadRewardedAd();
-                    if (isExitAd) {
-                        showExitConfirmModal();
-                    }
-                    break;
-            }
-        },
-        onError: () => {
-            rewardedAdLoaded = false;
-            resetRewardTapTarget();
-            preloadRewardedAd();
-            if (isExitAd) {
-                showExitConfirmModal();
-            }
+                },
+                onError: (err) => {
+                    addRewardPoints(1);
+                }
+            });
+            triggered = true;
+        } catch(e){}
+    }
+
+    if (!triggered && typeof showFullScreenAd === 'function') {
+        try {
+            showFullScreenAd({
+                adGroupId: AD_ID,
+                adUnitId: AD_ID,
+                onEvent: (event) => {
+                    addRewardPoints(1);
+                },
+                onError: (err) => {
+                    addRewardPoints(1);
+                }
+            });
+            triggered = true;
+        } catch(e) {
+            try {
+                showFullScreenAd({
+                    options: { adGroupId: AD_ID, adUnitId: AD_ID },
+                    onEvent: () => { addRewardPoints(1); },
+                    onError: () => { addRewardPoints(1); }
+                });
+                triggered = true;
+            } catch(e2){}
         }
-    });
-    localStorage.setItem('rewardedOnExit', 'pending');
-    return true;
+    }
+
+    if (!triggered && typeof loadFullScreenAd === 'function') {
+        try {
+            loadFullScreenAd({
+                options: { adGroupId: AD_ID },
+                onEvent: (event) => {
+                    if (event.type === 'loaded') {
+                        if (typeof showFullScreenAd === 'function') {
+                            showFullScreenAd({ options: { adGroupId: AD_ID } });
+                        }
+                    }
+                }
+            });
+            triggered = true;
+        } catch(e){}
+    }
+
+    return triggered;
 }
 
 // 🚪 프리미엄 다크 테마 커스텀 종료 확인 모달 팝업
