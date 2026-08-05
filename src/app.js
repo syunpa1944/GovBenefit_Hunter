@@ -1285,8 +1285,9 @@ function destroyAllTossBanners() {
 function attachTossBanner(containerId) {
     if (!ADS_ENABLED) return;
     const targetId = containerId || 'tossAdBanner';
-    
+
     let attempts = 0;
+    let rewardWaitAttempts = 0;
     const checkAndRender = () => {
         const container = document.getElementById(targetId);
         if (!container) {
@@ -1294,6 +1295,15 @@ function attachTossBanner(containerId) {
                 attempts++;
                 setTimeout(checkAndRender, 80);
             }
+            return;
+        }
+
+        // 토스 공식 FAQ: Android 5.266~5.267 버전에서 전면형/보상형과 배너 광고를 동시에
+        // 로드하면 전면형/보상형 이벤트가 유실됨. 리워드 preload가 진행 중이면 잠깐 대기 후
+        // 배너를 붙인다. (리워드가 no-fill로 응답이 영영 안 올 수도 있어 대기 시간은 상한을 둔다)
+        if (rewardedAdLoading && rewardWaitAttempts < 20) {
+            rewardWaitAttempts++;
+            setTimeout(checkAndRender, 100);
             return;
         }
 
