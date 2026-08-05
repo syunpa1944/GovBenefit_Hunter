@@ -1630,20 +1630,22 @@ window.onload = () => {
 
         checkPendingReward();
 
+        // 공식 문서(interstitial-rewarded-ad) 예제는 TossAds.initialize()를 기다리지 않고
+        // loadFullScreenAd를 바로 호출한다. initialize()의 onInitialized 콜백이 이 환경에서
+        // 발동하지 않으면 preload 자체가 시작조차 안 되던 문제라, 초기화 결과와 무관하게 즉시 preload한다.
+        preloadRewardedAd();
+
         if (typeof TossAds !== 'undefined' && TossAds.initialize && TossAds.initialize.isSupported()) {
             TossAds.initialize({
                 callbacks: {
                     onInitialized: () => {
-                        console.log('[리워드광고] TossAds.initialize 성공');
-                        preloadRewardedAd();
+                        console.log('[리워드광고] TossAds.initialize 성공 (참고용, preload와 무관)');
                     },
                     onInitializationFailed: (err) => {
-                        console.error('[리워드광고] TossAds.initialize 실패:', err);
+                        console.error('[리워드광고] TossAds.initialize 실패 (참고용, preload와 무관):', err);
                     }
                 }
             });
-        } else {
-            preloadRewardedAd();
         }
 
         // 토스 뒤로가기 버튼 클릭 가로채기 ➡️ 종료 확인 모달 즉시 노출
