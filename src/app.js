@@ -1373,8 +1373,10 @@ const REWARDED_AD_ID = 'ait.v2.live.be0a965d07e0432b'; // 실제 상용 출시�
 
 let rewardedAdLoading = false;
 
-// 진단 완료: 공식 테스트 ID로 preload→show까지 정상 확인됨. 문제는 라이브 슬롯의 인벤토리/서빙 상태.
-function debugAlert() {}
+// 임시 디버그용: 실기기 QR 테스트에서 원격 콘솔 없이도 화면에서 바로 확인하기 위해 재활성화
+function debugAlert(msg) {
+    try { alert('[리워드광고 디버그]\n' + msg); } catch (e) {}
+}
 
 // onLoaded: 'loaded' 이벤트를 받은 뒤 실행할 콜백 (토스 문서 규정: load → loaded 수신 → show 순서를 지키기 위함)
 function preloadRewardedAd(onLoaded) {
