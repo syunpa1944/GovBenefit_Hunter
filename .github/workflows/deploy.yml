@@ -36,6 +36,7 @@ jobs:
         pip install requests pandas openpyxl
 
     - name: Run Benefit Data Injector
+      continue-on-error: true
       env:
         DATA_GO_KR_KEY: ${{ secrets.DATA_GO_KR_KEY }}
       run: |
