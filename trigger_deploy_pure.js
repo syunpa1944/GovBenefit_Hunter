@@ -49,21 +49,20 @@ async function deploy() {
     const startData = await startResp.json();
     console.log('  ✅ 업로드 URL 수신 완료');
 
-    if (!startData.uploadUrl) {
+    const uploadUrl = startData.uploadUrl || (startData.success && startData.success.uploadUrl);
+    if (!uploadUrl) {
         throw new Error('uploadUrl 누락: ' + JSON.stringify(startData));
     }
 
     // 2단계: 파일 업로드
     console.log('\n[2/4] AIT 파일 업로드 중...');
-    const fileStream = fs.createReadStream(AIT_PATH);
-    const uploadResp = await fetch(startData.uploadUrl, {
+    const fileBuffer = fs.readFileSync(AIT_PATH);
+    const uploadResp = await fetch(uploadUrl, {
         method: 'PUT',
         headers: {
-            'Content-Type': 'application/zip',
-            'Content-Length': String(stat.size)
+            'Content-Type': 'application/zip'
         },
-        body: fileStream,
-        duplex: 'half'
+        body: fileBuffer
     });
 
     if (!uploadResp.ok) {

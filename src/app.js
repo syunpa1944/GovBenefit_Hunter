@@ -1362,12 +1362,19 @@ resetRewardTapTarget();
 const REWARDED_AD_ID = 'ait.v2.live.be0a965d07e0432b'; // 실제 상용 출시용 리워드 광고 ID
 
 function preloadRewardedAd() {
-    if (typeof loadFullScreenAd === 'undefined' || !loadFullScreenAd.isSupported()) {
+    if (typeof loadFullScreenAd === 'undefined') {
+        console.warn('[리워드광고] loadFullScreenAd SDK 함수가 로드되지 않음 (sdk-bridge.js 미로드 또는 바인딩 실패)');
         return;
     }
+    if (!loadFullScreenAd.isSupported()) {
+        console.warn('[리워드광고] loadFullScreenAd.isSupported() === false (현재 토스 앱 버전/환경에서 미지원)');
+        return;
+    }
+    console.log('[리워드광고] preload 요청:', REWARDED_AD_ID);
     loadFullScreenAd({
         options: { adGroupId: REWARDED_AD_ID },
         onEvent: (event) => {
+            console.log('[리워드광고] preload onEvent:', event && event.type, event);
             if (event.type === 'loaded') {
                 rewardedAdLoaded = true;
                 if (typeof TossPixel !== 'undefined') {
@@ -1375,7 +1382,9 @@ function preloadRewardedAd() {
                 }
             }
         },
-        onError: () => {}
+        onError: (err) => {
+            console.error('[리워드광고] preload onError (광고 슬롯 미승인/노출가능재고없음 등 확인 필요):', err);
+        }
     });
 }
 
@@ -1397,7 +1406,12 @@ function classifyItemCategory(item) {
 }
 
 function tryShowRewardedAd() {
-    if (!rewardedAdLoaded || typeof showFullScreenAd === 'undefined' || !showFullScreenAd.isSupported()) {
+    if (!rewardedAdLoaded) {
+        console.warn('[리워드광고] 표시 시도했으나 아직 preload가 완료되지 않음 (rewardedAdLoaded=false)');
+        return false;
+    }
+    if (typeof showFullScreenAd === 'undefined' || !showFullScreenAd.isSupported()) {
+        console.warn('[리워드광고] showFullScreenAd 미지원 환경');
         return false;
     }
     showFullScreenAd({
@@ -1422,7 +1436,8 @@ function tryShowRewardedAd() {
                     break;
             }
         },
-        onError: () => {
+        onError: (err) => {
+            console.error('[리워드광고] show onError:', err);
             rewardedAdLoaded = false;
             showExitConfirmModal();
         }
@@ -1605,9 +1620,12 @@ window.onload = () => {
             TossAds.initialize({
                 callbacks: {
                     onInitialized: () => {
+                        console.log('[리워드광고] TossAds.initialize 성공');
                         preloadRewardedAd();
                     },
-                    onInitializationFailed: () => {}
+                    onInitializationFailed: (err) => {
+                        console.error('[리워드광고] TossAds.initialize 실패:', err);
+                    }
                 }
             });
         } else {

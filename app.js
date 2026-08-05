@@ -513,46 +513,6 @@ function updateDashboard() {
             }
         });
     });
-                } else if (item.amount) {
-                    // 2단계: benefits가 없는 단독 혜택인 경우, 행사 타이틀 기준으로 중복을 체크해 합산
-                    const cleanAmountStr = item.amount.replace(/%/g, 'percent').replace(/,/g, '');
-                    let parsedVal = 0;
-
-                    const manwonMatch = cleanAmountStr.match(/(\d+)\s*만/);
-                    if (manwonMatch) {
-                        parsedVal = parseInt(manwonMatch[1]) * 10000;
-                    } else {
-                        const wonMatch = cleanAmountStr.match(/(\d+)\s*원/);
-                        if (wonMatch) {
-                            const val = parseInt(wonMatch[1]);
-                            if (val >= 1000) parsedVal = val;
-                        } else {
-                            // 단순 숫자 추출 백업
-                            const numbers = cleanAmountStr.match(/\d+/g);
-                            if (numbers) {
-                                const val = Math.max(...numbers.map(Number));
-                                if (val >= 1000) parsedVal = val;
-                            }
-                        }
-                    }
-
-                    if (parsedVal > 0) {
-                        if (usedBenefits.includes(item.title)) {
-                            if (!addedTitles.has(item.title)) {
-                                usedAmount += parsedVal;
-                                addedTitles.add(item.title);
-                            }
-                        } else {
-                            if (!addedTitles.has(item.title)) {
-                                totalMaxAmount += parsedVal;
-                                addedTitles.add(item.title);
-                            }
-                        }
-                    }
-                }
-            }
-        });
-    });
 
     const displayEl = document.getElementById('totalBenefitDisplay');
     if (displayEl) {
