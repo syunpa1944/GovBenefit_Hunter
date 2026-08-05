@@ -1361,7 +1361,10 @@ function resetRewardTapTarget() {
 resetRewardTapTarget();
 const REWARDED_AD_ID = 'ait.v2.live.be0a965d07e0432b'; // 실제 상용 출시용 리워드 광고 ID
 
-function preloadRewardedAd() {
+let rewardedAdLoading = false;
+
+// onLoaded: 'loaded' 이벤트를 받은 뒤 실행할 콜백 (토스 문서 규정: load → loaded 수신 → show 순서를 지키기 위함)
+function preloadRewardedAd(onLoaded) {
     if (typeof loadFullScreenAd === 'undefined') {
         console.warn('[리워드광고] loadFullScreenAd SDK 함수가 로드되지 않음 (sdk-bridge.js 미로드 또는 바인딩 실패)');
         return;
@@ -1370,19 +1373,28 @@ function preloadRewardedAd() {
         console.warn('[리워드광고] loadFullScreenAd.isSupported() === false (현재 토스 앱 버전/환경에서 미지원)');
         return;
     }
+    if (rewardedAdLoading) {
+        // 토스 문서: 동일 adGroupId 기준으로는 한 번에 하나의 광고만 미리 로드 가능
+        console.warn('[리워드광고] 이미 preload 진행 중 - 중복 요청 무시');
+        return;
+    }
+    rewardedAdLoading = true;
     console.log('[리워드광고] preload 요청:', REWARDED_AD_ID);
     loadFullScreenAd({
         options: { adGroupId: REWARDED_AD_ID },
         onEvent: (event) => {
             console.log('[리워드광고] preload onEvent:', event && event.type, event);
             if (event.type === 'loaded') {
+                rewardedAdLoading = false;
                 rewardedAdLoaded = true;
                 if (typeof TossPixel !== 'undefined') {
                     try { TossPixel('7874162214141259463').adImpression(); } catch (e) {}
                 }
+                if (typeof onLoaded === 'function') onLoaded();
             }
         },
         onError: (err) => {
+            rewardedAdLoading = false;
             console.error('[리워드광고] preload onError (광고 슬롯 미승인/노출가능재고없음 등 확인 필요):', err);
         }
     });
@@ -1430,6 +1442,7 @@ function tryShowRewardedAd() {
                 case 'dismissed':
                 case 'failedToShow':
                     rewardedAdLoaded = false;
+                    localStorage.removeItem('rewardedOnExit'); // pending 상태로 계속 남아 다음 실행 시 재시도 무한루프 방지
                     preloadRewardedAd();
                     // 광고 종료/실패 후 종료 확인 모달 호출
                     showExitConfirmModal();
@@ -1439,6 +1452,7 @@ function tryShowRewardedAd() {
         onError: (err) => {
             console.error('[리워드광고] show onError:', err);
             rewardedAdLoaded = false;
+            localStorage.removeItem('rewardedOnExit'); // pending 상태로 계속 남아 다음 실행 시 재시도 무한루프 방지
             showExitConfirmModal();
         }
     });
@@ -1598,8 +1612,8 @@ function checkPendingReward() {
     if (status === 'pending') {
         if (confirm('이전에 광고 시청이 완료되지 않았습니다. 지면 광고를 시청하시겠습니까?')) {
             safeLocalStorage.removeItem('rewardedOnExit');
-            preloadRewardedAd();
-            tryShowRewardedAd();
+            // 토스 문서 규정: loaded 이벤트 수신 후에만 show 호출 (preload 직후 즉시 호출 시 100% 실패)
+            preloadRewardedAd(() => tryShowRewardedAd());
         } else {
             safeLocalStorage.removeItem('rewardedOnExit');
         }
