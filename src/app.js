@@ -1363,10 +1363,16 @@ const REWARDED_AD_ID = 'ait.v2.live.be0a965d07e0432b'; // 실제 상용 출시�
 
 let rewardedAdLoading = false;
 
+// 임시 디버그용: 원격 콘솔 접근이 어려운 실기기 테스트에서 화면에 바로 보이도록 alert 병행 (문제 해결 후 제거 예정)
+function debugAlert(msg) {
+    try { alert('[리워드광고 디버그]\n' + msg); } catch (e) {}
+}
+
 // onLoaded: 'loaded' 이벤트를 받은 뒤 실행할 콜백 (토스 문서 규정: load → loaded 수신 → show 순서를 지키기 위함)
 function preloadRewardedAd(onLoaded) {
     if (typeof loadFullScreenAd === 'undefined') {
         console.warn('[리워드광고] loadFullScreenAd SDK 함수가 로드되지 않음 (sdk-bridge.js 미로드 또는 바인딩 실패)');
+        debugAlert('loadFullScreenAd 함수가 없음 (SDK 미로드)');
         return;
     }
     // SDK 내부 핸들러가 아직 준비되지 않은 시점에 isSupported()를 호출하면 예외를 던질 수 있어서
@@ -1376,10 +1382,12 @@ function preloadRewardedAd(onLoaded) {
         supported = loadFullScreenAd.isSupported();
     } catch (e) {
         console.warn('[리워드광고] loadFullScreenAd.isSupported() 호출 중 예외 (SDK 미준비 상태로 추정):', e);
+        debugAlert('isSupported() 호출 중 예외: ' + (e && e.message));
         return;
     }
     if (!supported) {
         console.warn('[리워드광고] loadFullScreenAd.isSupported() === false (현재 토스 앱 버전/환경에서 미지원)');
+        debugAlert('isSupported() === false (이 환경/버전에서 리워드 광고 미지원)');
         return;
     }
     if (rewardedAdLoading) {
@@ -1397,6 +1405,7 @@ function preloadRewardedAd(onLoaded) {
             if (event.type === 'loaded') {
                 rewardedAdLoading = false;
                 rewardedAdLoaded = true;
+                debugAlert('preload 성공! (loaded 이벤트 수신) - 이제 달력 탭하면 광고가 떠야 함');
                 if (typeof TossPixel !== 'undefined') {
                     try { TossPixel('7874162214141259463').adImpression(); } catch (e) {}
                 }
@@ -1406,11 +1415,13 @@ function preloadRewardedAd(onLoaded) {
         onError: (err) => {
             rewardedAdLoading = false;
             console.error('[리워드광고] preload onError (광고 슬롯 미승인/노출가능재고없음 등 확인 필요):', err);
+            debugAlert('preload onError: ' + JSON.stringify(err));
         }
     });
     } catch (e) {
         rewardedAdLoading = false;
         console.warn('[리워드광고] loadFullScreenAd() 호출 중 예외:', e);
+        debugAlert('loadFullScreenAd() 호출 중 예외: ' + (e && e.message));
     }
 }
 
@@ -1434,10 +1445,12 @@ function classifyItemCategory(item) {
 function tryShowRewardedAd() {
     if (!rewardedAdLoaded) {
         console.warn('[리워드광고] 표시 시도했으나 아직 preload가 완료되지 않음 (rewardedAdLoaded=false)');
+        debugAlert('달력 ' + rewardTapTarget + '회 탭 도달! 하지만 광고가 아직 preload 안 됨 (rewardedAdLoaded=false)');
         return false;
     }
     if (typeof showFullScreenAd === 'undefined') {
         console.warn('[리워드광고] showFullScreenAd 미지원 환경');
+        debugAlert('달력 탭 도달했지만 showFullScreenAd 함수 자체가 없음');
         return false;
     }
     let supported = false;
@@ -1445,12 +1458,15 @@ function tryShowRewardedAd() {
         supported = showFullScreenAd.isSupported();
     } catch (e) {
         console.warn('[리워드광고] showFullScreenAd.isSupported() 호출 중 예외:', e);
+        debugAlert('showFullScreenAd.isSupported() 호출 중 예외: ' + (e && e.message));
         return false;
     }
     if (!supported) {
         console.warn('[리워드광고] showFullScreenAd 미지원 환경');
+        debugAlert('showFullScreenAd.isSupported() === false');
         return false;
     }
+    debugAlert('달력 ' + rewardTapTarget + '회 탭 도달! showFullScreenAd 호출 시도 중...');
     try {
     showFullScreenAd({
         options: { adGroupId: REWARDED_AD_ID },
@@ -1477,6 +1493,7 @@ function tryShowRewardedAd() {
         },
         onError: (err) => {
             console.error('[리워드광고] show onError:', err);
+            debugAlert('show onError: ' + JSON.stringify(err));
             rewardedAdLoaded = false;
             localStorage.removeItem('rewardedOnExit'); // pending 상태로 계속 남아 다음 실행 시 재시도 무한루프 방지
             showExitConfirmModal();
@@ -1484,6 +1501,7 @@ function tryShowRewardedAd() {
     });
     } catch (e) {
         console.warn('[리워드광고] showFullScreenAd() 호출 중 예외:', e);
+        debugAlert('showFullScreenAd() 호출 중 예외: ' + (e && e.message));
         return false;
     }
     localStorage.setItem('rewardedOnExit', 'pending');
