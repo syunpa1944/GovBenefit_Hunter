@@ -875,19 +875,23 @@ function render() {
             cell.appendChild(iconWrap);
 
             cell.onclick = () => {
-                openSheet(dateStr, filtered);
                 if (ADS_ENABLED) {
                     rewardTapCount++;
                     if (rewardTapCount >= rewardTapTarget) {
-                        if (tryShowRewardedAd()) {
-                            resetRewardTapTarget();
-                            preloadRewardedAd();
-                        } else {
-                            resetRewardTapTarget();
-                            preloadRewardedAd();
+                        // 토스 공식 FAQ 권장: 전면형/보상형과 배너를 동시에 로드/표시하면 이벤트가
+                        // 유실될 수 있어, 리워드 표시를 시도하는 동안은 배너 부착을 잠가둔다.
+                        rewardShowLocking = true;
+                        openSheet(dateStr, filtered);
+                        const shown = tryShowRewardedAd();
+                        resetRewardTapTarget();
+                        preloadRewardedAd();
+                        if (!shown) {
+                            rewardShowLocking = false;
                         }
+                        return;
                     }
                 }
+                openSheet(dateStr, filtered);
             };
         } else {
             cell.onclick = () => console.log(dateStr + " 조건 혜택 없음");
@@ -1301,7 +1305,7 @@ function attachTossBanner(containerId) {
         // 토스 공식 FAQ: Android 5.266~5.267 버전에서 전면형/보상형과 배너 광고를 동시에
         // 로드하면 전면형/보상형 이벤트가 유실됨. 리워드 preload가 진행 중이면 잠깐 대기 후
         // 배너를 붙인다. (리워드가 no-fill로 응답이 영영 안 올 수도 있어 대기 시간은 상한을 둔다)
-        if (rewardedAdLoading && rewardWaitAttempts < 20) {
+        if ((rewardedAdLoading || rewardShowLocking) && rewardWaitAttempts < 20) {
             rewardWaitAttempts++;
             setTimeout(checkAndRender, 100);
             return;
@@ -1364,6 +1368,8 @@ let rewardedAdLoaded = false;
 let rewardedThisSession = false;
 let rewardTapCount = 0;
 let rewardTapTarget = 0;
+// 리워드 표시 시도 중에는 배너 부착을 잠가서 전면형/보상형-배너 동시 로드/표시 충돌을 막는다
+let rewardShowLocking = false;
 function resetRewardTapTarget() {
     rewardTapCount = 0;
     rewardTapTarget = Math.floor(Math.random() * 3) + 3;
@@ -1484,6 +1490,7 @@ function tryShowRewardedAd() {
             switch (event.type) {
                 case 'userEarnedReward':
                 case 'reward':
+                    rewardShowLocking = false;
                     localStorage.setItem('rewardedOnExit', 'done');
                     addRewardPoints(1);
                     // 광고 완료 후 즉시 종료 확인 모달 호출
@@ -1493,6 +1500,7 @@ function tryShowRewardedAd() {
                     break;
                 case 'dismissed':
                 case 'failedToShow':
+                    rewardShowLocking = false;
                     rewardedAdLoaded = false;
                     localStorage.removeItem('rewardedOnExit'); // pending 상태로 계속 남아 다음 실행 시 재시도 무한루프 방지
                     preloadRewardedAd();
@@ -1504,6 +1512,7 @@ function tryShowRewardedAd() {
         onError: (err) => {
             console.error('[리워드광고] show onError:', err);
             debugAlert('show onError: ' + JSON.stringify(err));
+            rewardShowLocking = false;
             rewardedAdLoaded = false;
             localStorage.removeItem('rewardedOnExit'); // pending 상태로 계속 남아 다음 실행 시 재시도 무한루프 방지
             showExitConfirmModal();
@@ -1515,6 +1524,9 @@ function tryShowRewardedAd() {
         return false;
     }
     localStorage.setItem('rewardedOnExit', 'pending');
+    // 안전장치: onEvent/onError가 영영 안 오는 경우(no-fill 등) 배너가 영구적으로
+    // 잠긴 채로 남지 않도록 상한 시간 후 자동 해제
+    setTimeout(() => { rewardShowLocking = false; }, 8000);
     return true;
 }
 
