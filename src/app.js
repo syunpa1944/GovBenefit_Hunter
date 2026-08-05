@@ -1359,17 +1359,12 @@ function resetRewardTapTarget() {
     rewardTapTarget = Math.floor(Math.random() * 3) + 3;
 }
 resetRewardTapTarget();
-// 임시 진단용: 라이브 ID가 onEvent/onError 둘 다 응답이 없는(no-fill/인벤토리 문제) 것인지,
-// SDK 연동 자체 문제인지 구분하기 위해 공식 테스트 광고 ID로 잠시 교체. 원인 확인 후 되돌릴 것.
-// 원래 값: 'ait.v2.live.be0a965d07e0432b'
-const REWARDED_AD_ID = 'ait-ad-test-rewarded-id';
+const REWARDED_AD_ID = 'ait.v2.live.be0a965d07e0432b'; // 실제 상용 출시용 리워드 광고 ID
 
 let rewardedAdLoading = false;
 
-// 임시 디버그용: 원격 콘솔 접근이 어려운 실기기 테스트에서 화면에 바로 보이도록 alert 병행 (문제 해결 후 제거 예정)
-function debugAlert(msg) {
-    try { alert('[리워드광고 디버그]\n' + msg); } catch (e) {}
-}
+// 진단 완료: 공식 테스트 ID로 preload→show까지 정상 확인됨. 문제는 라이브 슬롯의 인벤토리/서빙 상태.
+function debugAlert() {}
 
 // onLoaded: 'loaded' 이벤트를 받은 뒤 실행할 콜백 (토스 문서 규정: load → loaded 수신 → show 순서를 지키기 위함)
 function preloadRewardedAd(onLoaded) {

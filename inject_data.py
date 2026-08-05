@@ -483,6 +483,17 @@ def build_data():
 
 if __name__ == "__main__":
     result = build_data()
+
+    # 안전장치: 외부 API 실패/누락 등으로 결과가 비정상적으로 적으면 정상 데이터를 나쁜 데이터로
+    # 덮어쓰지 않도록 여기서 중단시킨다. 정상 범위는 하루 평균 수십~수백 건, 총 1만 건 이상.
+    total_items = sum(len(v) for v in result.values() if isinstance(v, list))
+    MIN_EXPECTED_ITEMS = 5000
+    if total_items < MIN_EXPECTED_ITEMS:
+        print(f"ERROR: 생성된 데이터가 비정상적으로 적습니다 (총 {total_items}건, 최소 기대치 {MIN_EXPECTED_ITEMS}건). "
+              f"외부 API 실패 등으로 판단되어 data.json/data.js 갱신을 중단합니다.")
+        raise SystemExit(1)
+    print(f"데이터 검증 통과: 총 {total_items}건 생성")
+
     script_dir = os.path.dirname(__file__)
 
     # data.js — app.js가 <script> 태그로 로드하는 파일

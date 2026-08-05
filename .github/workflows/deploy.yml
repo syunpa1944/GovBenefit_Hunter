@@ -50,7 +50,7 @@ jobs:
       run: |
         git config --global user.name "github-actions[bot]"
         git config --global user.email "github-actions[bot]@users.noreply.github.com"
-        git add data.json data.js test-app/public/data.json test-app/public/data.js || true
+        git add data.json data.js public/data.json public/data.js test-app/public/data.json test-app/public/data.js || true
         git commit -m "auto: 매일 공공데이터 수집 자동 갱신 [skip ci]" || echo "No changes to commit"
         git push origin main || echo "Git push failed or no changes"
 
