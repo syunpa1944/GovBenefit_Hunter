@@ -63,7 +63,6 @@ jobs:
       env:
         AIT_ACCESS_TOKEN: ${{ secrets.AIT_ACCESS_TOKEN }}
         NODE_OPTIONS: "--max-old-space-size=4096" # 메모리 고갈 방지 힙 상향
-        DEBUG: "*"
       run: |
         npm install
         node build_static.js
@@ -76,4 +75,4 @@ jobs:
       env:
         NODE_OPTIONS: "--max-old-space-size=4096" # 최종 업로드 메모리 고갈 방지
       run: |
-        npx ait deploy --api-key "${{ secrets.AIT_ACCESS_TOKEN }}" --app-id 32871 --version-name $(date +'%Y%m%d')-${{ github.run_number }} --timeout 120 2>&1
+        npx ait deploy --api-key "${{ secrets.AIT_ACCESS_TOKEN }}" -m "정부혜택달력 자동 빌드 배포 $(date +'%Y%m%d')-${{ github.run_number }}" --timeout 120 2>&1
