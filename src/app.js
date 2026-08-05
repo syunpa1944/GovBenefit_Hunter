@@ -1369,7 +1369,16 @@ function preloadRewardedAd(onLoaded) {
         console.warn('[리워드광고] loadFullScreenAd SDK 함수가 로드되지 않음 (sdk-bridge.js 미로드 또는 바인딩 실패)');
         return;
     }
-    if (!loadFullScreenAd.isSupported()) {
+    // SDK 내부 핸들러가 아직 준비되지 않은 시점에 isSupported()를 호출하면 예외를 던질 수 있어서
+    // (그대로 두면 window.onload 전체가 중단되어 캘린더/혜택 데이터 로드까지 같이 멈춤) 반드시 감싼다.
+    let supported = false;
+    try {
+        supported = loadFullScreenAd.isSupported();
+    } catch (e) {
+        console.warn('[리워드광고] loadFullScreenAd.isSupported() 호출 중 예외 (SDK 미준비 상태로 추정):', e);
+        return;
+    }
+    if (!supported) {
         console.warn('[리워드광고] loadFullScreenAd.isSupported() === false (현재 토스 앱 버전/환경에서 미지원)');
         return;
     }
@@ -1380,6 +1389,7 @@ function preloadRewardedAd(onLoaded) {
     }
     rewardedAdLoading = true;
     console.log('[리워드광고] preload 요청:', REWARDED_AD_ID);
+    try {
     loadFullScreenAd({
         options: { adGroupId: REWARDED_AD_ID },
         onEvent: (event) => {
@@ -1398,6 +1408,10 @@ function preloadRewardedAd(onLoaded) {
             console.error('[리워드광고] preload onError (광고 슬롯 미승인/노출가능재고없음 등 확인 필요):', err);
         }
     });
+    } catch (e) {
+        rewardedAdLoading = false;
+        console.warn('[리워드광고] loadFullScreenAd() 호출 중 예외:', e);
+    }
 }
 
 // 마스터 대시보드 100% 동일 4대 정밀 카테고리 분류 엔진
@@ -1422,10 +1436,22 @@ function tryShowRewardedAd() {
         console.warn('[리워드광고] 표시 시도했으나 아직 preload가 완료되지 않음 (rewardedAdLoaded=false)');
         return false;
     }
-    if (typeof showFullScreenAd === 'undefined' || !showFullScreenAd.isSupported()) {
+    if (typeof showFullScreenAd === 'undefined') {
         console.warn('[리워드광고] showFullScreenAd 미지원 환경');
         return false;
     }
+    let supported = false;
+    try {
+        supported = showFullScreenAd.isSupported();
+    } catch (e) {
+        console.warn('[리워드광고] showFullScreenAd.isSupported() 호출 중 예외:', e);
+        return false;
+    }
+    if (!supported) {
+        console.warn('[리워드광고] showFullScreenAd 미지원 환경');
+        return false;
+    }
+    try {
     showFullScreenAd({
         options: { adGroupId: REWARDED_AD_ID },
         onEvent: (event) => {
@@ -1456,6 +1482,10 @@ function tryShowRewardedAd() {
             showExitConfirmModal();
         }
     });
+    } catch (e) {
+        console.warn('[리워드광고] showFullScreenAd() 호출 중 예외:', e);
+        return false;
+    }
     localStorage.setItem('rewardedOnExit', 'pending');
     return true;
 }
@@ -1635,17 +1665,21 @@ window.onload = () => {
         // 발동하지 않으면 preload 자체가 시작조차 안 되던 문제라, 초기화 결과와 무관하게 즉시 preload한다.
         preloadRewardedAd();
 
-        if (typeof TossAds !== 'undefined' && TossAds.initialize && TossAds.initialize.isSupported()) {
-            TossAds.initialize({
-                callbacks: {
-                    onInitialized: () => {
-                        console.log('[리워드광고] TossAds.initialize 성공 (참고용, preload와 무관)');
-                    },
-                    onInitializationFailed: (err) => {
-                        console.error('[리워드광고] TossAds.initialize 실패 (참고용, preload와 무관):', err);
+        try {
+            if (typeof TossAds !== 'undefined' && TossAds.initialize && TossAds.initialize.isSupported()) {
+                TossAds.initialize({
+                    callbacks: {
+                        onInitialized: () => {
+                            console.log('[리워드광고] TossAds.initialize 성공 (참고용, preload와 무관)');
+                        },
+                        onInitializationFailed: (err) => {
+                            console.error('[리워드광고] TossAds.initialize 실패 (참고용, preload와 무관):', err);
+                        }
                     }
-                }
-            });
+                });
+            }
+        } catch (e) {
+            console.warn('[리워드광고] TossAds.initialize 호출 중 예외 (참고용, preload와 무관):', e);
         }
 
         // 토스 뒤로가기 버튼 클릭 가로채기 ➡️ 종료 확인 모달 즉시 노출
