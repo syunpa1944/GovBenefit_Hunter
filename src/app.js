@@ -1359,7 +1359,10 @@ function resetRewardTapTarget() {
     rewardTapTarget = Math.floor(Math.random() * 3) + 3;
 }
 resetRewardTapTarget();
-const REWARDED_AD_ID = 'ait.v2.live.be0a965d07e0432b'; // 실제 상용 출시용 리워드 광고 ID
+// 임시 진단용: 라이브 ID가 onEvent/onError 둘 다 응답이 없는(no-fill/인벤토리 문제) 것인지,
+// SDK 연동 자체 문제인지 구분하기 위해 공식 테스트 광고 ID로 잠시 교체. 원인 확인 후 되돌릴 것.
+// 원래 값: 'ait.v2.live.be0a965d07e0432b'
+const REWARDED_AD_ID = 'ait-ad-test-rewarded-id';
 
 let rewardedAdLoading = false;
 
